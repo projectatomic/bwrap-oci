@@ -1,0 +1,23 @@
+#!/bin/sh
+set -euo pipefail
+
+export TMP_DIR=$(mktemp -p $(pwd) -d -t .tmp.XXXXXXXXXX)
+
+teardown () {
+    rm -rf $TMP_DIR
+}
+trap teardown EXIT
+
+if test "x${REGENERATE_TESTS_DATA-}" != x && test -e $1.command; then
+    sh $1.command > $TMP_DIR/new-file
+    mv $TMP_DIR/new-file $1
+fi
+
+./bwrap-oci -c $1 --dry-run > $TMP_DIR/output
+
+if test "x${REGENERATE_TESTS_DATA-}" != x; then
+    cp $TMP_DIR/output $1.expected
+    exit 0
+fi
+
+cmp $TMP_DIR/output $1.expected
