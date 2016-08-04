@@ -379,6 +379,8 @@ do_mounts (struct context *con, JsonNode *rootval)
           sourceval = g_variant_get_string (destination, NULL);
           collect_options (con, "--bind", sourceval, destinationval, NULL);
         }
+      else if (g_strcmp0 (typeval, "devtmpfs") == 0)
+        collect_options (con, "--dev", destinationval, NULL);
       else if (g_strcmp0 (typeval, "cgroup") == 0)
         ;
       else if (g_strcmp0 (typeval, "devpts") == 0)

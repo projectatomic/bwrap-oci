@@ -16,7 +16,7 @@ bwrap_oci_LDADD = $(SELINUX_LIBS) $(JSON_GLIB_LIBS)
 
 TESTS = tests/bind.conf tests/cwd.conf tests/env.conf tests/hostname.conf \
 	tests/label.conf tests/mount.conf tests/mount-label.conf tests/rootfs.conf \
-	tests/seccomp.conf tests/tty.conf tests/uid.conf
+	tests/seccomp.conf tests/tty.conf tests/uid.conf tests/devtmpfs.conf
 
 TEST_EXTENSIONS = .conf
 CONF_LOG_COMPILER = $(top_srcdir)/tests/tests-runner
