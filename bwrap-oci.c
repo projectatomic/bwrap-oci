@@ -518,7 +518,7 @@ generate_bwrap_argv (struct context *context)
   int current_list = 0;
   GList **lists[] = {&context->options, &context->readonly_paths, &context->args, NULL};
 
-  bwrap_argv[bwrap_argc++] = "bwrap";
+  bwrap_argv[bwrap_argc++] = BWRAP;
   while (lists[current_list])
     {
       GList *l = *lists[current_list];
@@ -596,7 +596,7 @@ main (int argc, char *argv[])
       return EXIT_SUCCESS;
     }
 
-  execvp (bwrap_argv[0], bwrap_argv);
+  execv (BWRAP, bwrap_argv);
 
   return EXIT_FAILURE;
 }

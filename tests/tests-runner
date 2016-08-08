@@ -13,7 +13,7 @@ if test "x${REGENERATE_TESTS_DATA-}" != x && test -e $1.command; then
     mv $TMP_DIR/new-file $1
 fi
 
-./bwrap-oci -c $1 --dry-run > $TMP_DIR/output
+./bwrap-oci -c $1 --dry-run | sed -e "s|/.*/bwrap|bwrap|g" > $TMP_DIR/output
 
 if test "x${REGENERATE_TESTS_DATA-}" != x; then
     cp $TMP_DIR/output $1.expected

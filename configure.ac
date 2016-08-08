@@ -16,6 +16,9 @@ AM_PROG_CC_C_O
 PKG_CHECK_MODULES(JSON_GLIB, [json-glib-1.0])
 AC_CHECK_LIB(seccomp, seccomp_rule_add)
 
+AC_PATH_PROG(BWRAP, [bwrap])
+AC_DEFINE_UNQUOTED([BWRAP], ["$BWRAP"], [Path to bwrap])
+
 AC_CONFIG_FILES([
 Makefile
 ])
