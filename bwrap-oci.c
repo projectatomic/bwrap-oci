@@ -331,11 +331,24 @@ do_root (struct context *con, JsonNode *rootval)
   JsonObject *root = json_node_get_object (rootval);
   gboolean readonly = FALSE;
   JsonNode *path = json_object_get_member (root, "path");
+  const gchar *rootfs = json_node_get_string (path);
 
   if (json_object_has_member (root, "readonly"))
     readonly = json_node_get_boolean (json_object_get_member (root, "readonly"));
 
-  collect_options (con, readonly ? "--ro-bind" : "--bind", json_node_get_string (path), "/", NULL);
+  collect_options (con, "--bind", json_node_get_string (path), "/", NULL);
+
+  if (readonly)
+    {
+      char *usr = g_strdup_printf ("%s/usr", rootfs);
+      char *etc = g_strdup_printf ("%s/etc", rootfs);
+
+      collect_options (con, "--ro-bind", etc, "/etc", NULL);
+      collect_options (con, "--ro-bind", usr, "/usr", NULL);
+
+      g_free (usr);
+      g_free (etc);
+    }
 }
 
 static void
