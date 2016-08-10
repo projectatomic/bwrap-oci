@@ -3,7 +3,7 @@ bwrap-oci
 
 Run an OCI container using Bubblewrap (https://github.com/projectatomic/bubblewrap/).
 
-By default `bwrap-oci` reads the file `configuration.json` in the
+By default `bwrap-oci` reads the file `config.json` in the
 current directory, generates the command line arguments for bubblewrap
 and execute it.
 
