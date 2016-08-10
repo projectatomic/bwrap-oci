@@ -225,7 +225,7 @@ do_linux (struct context *con, JsonNode *rootval)
       const char *defActionString = "SCMP_ACT_ALLOW";
 
       if (defaultAction)
-        defActionString = json_node_get_string (defaultAction);
+          defActionString = json_node_get_string (defaultAction);
 
       con->seccomp = seccomp_init (get_seccomp_action (defActionString));
       if (con->seccomp == NULL)
@@ -270,46 +270,7 @@ do_linux (struct context *con, JsonNode *rootval)
           action = g_variant_get_string (actionvar, NULL);
           args = g_variant_lookup_value (variant, "args", G_VARIANT_TYPE_ARRAY);
 
-          if (args)
-            args_array = g_array_new (FALSE, FALSE, sizeof (struct scmp_arg_cmp));
-
-          for (child = 0; child < g_variant_n_children (args); child++)
-            {
-              struct scmp_arg_cmp arg_cmp;
-              GVariant *indexvar, *valuevar, *valueTwovar, *opvar;
-              guint64 index, value, valueTwo;
-              const char *op = NULL;
-              GVariant *arg = g_variant_get_variant (g_variant_get_child_value (args, child));
-
-              indexvar = g_variant_lookup_value (arg, "index", G_VARIANT_TYPE_INT64);
-              index = g_variant_get_int64 (indexvar);
-              valuevar = g_variant_lookup_value (arg, "value", G_VARIANT_TYPE_INT64);
-              value = g_variant_get_int64 (valuevar);
-              valueTwovar = g_variant_lookup_value (arg, "valueTwo", G_VARIANT_TYPE_INT64);
-              valueTwo = g_variant_get_int64 (valueTwovar);
-              opvar = g_variant_lookup_value (arg, "op", G_VARIANT_TYPE_STRING);
-              op = g_variant_get_string (opvar, NULL);
-
-              arg_cmp.arg = index;
-              arg_cmp.op = get_seccomp_operator (op);
-              arg_cmp.datum_a = value;
-              arg_cmp.datum_b = valueTwo;
-
-              g_array_append_val (args_array, arg_cmp);
-            }
-
-          if (args)
-            {
-              if (seccomp_rule_add_array (con->seccomp,
-                                          get_seccomp_action (action),
-                                          seccomp_syscall_resolve_name (name),
-                                          args_array->len,
-                                          (const struct scmp_arg_cmp *) args_array->data) < 0)
-                {
-                  error (EXIT_FAILURE, 0, "error while setting up seccomp");
-                }
-            }
-          else
+          if (args == NULL)
             {
               if (seccomp_rule_add (con->seccomp,
                                     get_seccomp_action (action),
@@ -318,9 +279,45 @@ do_linux (struct context *con, JsonNode *rootval)
                   error (EXIT_FAILURE, 0, "error while setting up seccomp");
                 }
             }
+          else
+            {
+              args_array = g_array_new (FALSE, FALSE, sizeof (struct scmp_arg_cmp));
+              for (child = 0; args_array && child < g_variant_n_children (args); child++)
+                {
+                  struct scmp_arg_cmp arg_cmp;
+                  GVariant *indexvar, *valuevar, *valueTwovar, *opvar;
+                  guint64 index, value, valueTwo;
+                  const char *op = NULL;
+                  GVariant *arg = g_variant_get_variant (g_variant_get_child_value (args, child));
 
-          if (args_array)
-            g_array_free (args_array, TRUE);
+                  indexvar = g_variant_lookup_value (arg, "index", G_VARIANT_TYPE_INT64);
+                  index = g_variant_get_int64 (indexvar);
+                  valuevar = g_variant_lookup_value (arg, "value", G_VARIANT_TYPE_INT64);
+                  value = g_variant_get_int64 (valuevar);
+                  valueTwovar = g_variant_lookup_value (arg, "valueTwo", G_VARIANT_TYPE_INT64);
+                  valueTwo = g_variant_get_int64 (valueTwovar);
+                  opvar = g_variant_lookup_value (arg, "op", G_VARIANT_TYPE_STRING);
+                  op = g_variant_get_string (opvar, NULL);
+
+                  arg_cmp.arg = index;
+                  arg_cmp.op = get_seccomp_operator (op);
+                  arg_cmp.datum_a = value;
+                  arg_cmp.datum_b = valueTwo;
+
+                  g_array_append_val (args_array, arg_cmp);
+                }
+
+              if (seccomp_rule_add_array (con->seccomp,
+                                          get_seccomp_action (action),
+                                          seccomp_syscall_resolve_name (name),
+                                          args_array->len,
+                                          (const struct scmp_arg_cmp *) args_array->data) < 0)
+                {
+                  error (EXIT_FAILURE, 0, "error while setting up seccomp");
+                }
+
+                g_array_free (args_array, TRUE);
+            }
         }
     }
 }
