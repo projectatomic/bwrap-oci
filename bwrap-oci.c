@@ -336,16 +336,7 @@ do_root (struct context *con, JsonNode *rootval)
   collect_options (con, "--bind", json_node_get_string (path), "/", NULL);
 
   if (readonly)
-    {
-      char *usr = g_strdup_printf ("%s/usr", rootfs);
-      char *etc = g_strdup_printf ("%s/etc", rootfs);
-
-      collect_options (con, "--ro-bind", etc, "/etc", NULL);
-      collect_options (con, "--ro-bind", usr, "/usr", NULL);
-
-      g_free (usr);
-      g_free (etc);
-    }
+    error (0, 0, "warning: readonly rootfs are not supported yet");
 }
 
 static void

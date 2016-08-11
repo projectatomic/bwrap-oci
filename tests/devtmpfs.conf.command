@@ -33,7 +33,7 @@ cat << EOF
 	},
 	"root": {
 		"path": "rootfs",
-		"readonly": true
+		"readonly": false
 	},
 	"hostname": "runc",
 	"mounts": [
