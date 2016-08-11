@@ -1,1 +1,1 @@
-bwrap --bind rootfs / --unshare-pid --unshare-net --unshare-ipc --unshare-uts --proc /proc --tmpfs /dev --tmpfs /dev/shm --mqueue /dev/mqueue --bind bar bar --chdir / --setenv PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin --setenv TERM xterm --uid 0 --gid 0 sh
+bwrap --bind rootfs / --unshare-pid --unshare-net --unshare-ipc --unshare-uts --proc /proc --tmpfs /dev --tmpfs /dev/shm --mqueue /dev/mqueue --bind foo bar --chdir / --setenv PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin --setenv TERM xterm --uid 0 --gid 0 sh

@@ -377,7 +377,7 @@ do_mounts (struct context *con, JsonNode *rootval)
           source = g_variant_lookup_value (variant, "source", G_VARIANT_TYPE_STRING);
           if (! source)
             error (EXIT_FAILURE, 0, "invalid source for bind mount\n");
-          sourceval = g_variant_get_string (destination, NULL);
+          sourceval = g_variant_get_string (source, NULL);
           collect_options (con, "--bind", sourceval, destinationval, NULL);
         }
       else if (g_strcmp0 (typeval, "devtmpfs") == 0)
