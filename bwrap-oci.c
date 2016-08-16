@@ -29,6 +29,7 @@
 #include <seccomp.h>
 #include <errno.h>
 #include <glib/gprintf.h>
+#include <string.h>
 
 static gboolean opt_dry_run;
 static gboolean opt_version;
@@ -106,6 +107,47 @@ append_to_list (struct context *context, GList *list, va_list valist)
       context->total_elements++;
     }
   return list;
+}
+
+static GHashTable *bwrap_options = NULL;
+
+static void
+read_bwrap_help ()
+{
+  const gchar *argv[] = {BWRAP, "--help", NULL};
+  gchar *output = NULL;
+  gint exit_status;
+
+  if (g_spawn_sync (NULL, (gchar **) argv, NULL, G_SPAWN_DEFAULT, NULL,
+                    NULL, &output, NULL, &exit_status, NULL) == FALSE)
+    {
+      error (EXIT_FAILURE, errno, "Error running bwrap --help");
+    }
+
+  bwrap_options = g_hash_table_new (g_str_hash, g_str_equal);
+
+  for (gchar *end, *it = strstr (output, "    --"); it; it = strstr (end + 1, "    --"))
+    {
+      gchar *value;
+      end = strchr (it + 6, ' ');
+      if (end == NULL)
+        break;
+      *end = '\0';
+
+      value = g_strdup (it + 6);
+      g_hash_table_insert (bwrap_options, value, value);
+      printf ("ADD VALUE %s\n", value);
+    }
+
+  g_free (output);
+}
+
+static gboolean
+bwrap_has_option (const gchar *option)
+{
+  if (bwrap_options == NULL)
+    read_bwrap_help ();
+  return g_hash_table_contains (bwrap_options, option);
 }
 
 static void
