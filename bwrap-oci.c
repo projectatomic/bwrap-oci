@@ -49,6 +49,7 @@ struct context
   GList *readonly_paths;
   GList *args;
   size_t total_elements;
+  gboolean remount_ro_rootfs;
   scmp_filter_ctx seccomp;
 };
 
@@ -378,7 +379,12 @@ do_root (struct context *con, JsonNode *rootval)
   collect_options (con, "--bind", json_node_get_string (path), "/", NULL);
 
   if (readonly)
-    error (0, 0, "warning: readonly rootfs are not supported yet");
+    {
+      if (bwrap_has_option ("remount-ro"))
+        con->remount_ro_rootfs = TRUE;
+      else
+        error (0, 0, "warning: readonly rootfs are not supported yet");
+    }
 }
 
 static void
@@ -540,6 +546,15 @@ generate_seccomp_rules_file (struct context *context)
     }
 }
 
+static void
+finalize (struct context *context)
+{
+  generate_seccomp_rules_file (context);
+
+  if (context->remount_ro_rootfs)
+    add_readonly_path (context, "--remount-ro", "/", NULL);
+}
+
 static char **
 generate_bwrap_argv (struct context *context)
 {
@@ -615,7 +630,7 @@ main (int argc, char *argv[])
 
   g_object_unref (parser);
 
-  generate_seccomp_rules_file (context);
+  finalize (context);
   bwrap_argv = generate_bwrap_argv (context);
 
   g_free (context);
