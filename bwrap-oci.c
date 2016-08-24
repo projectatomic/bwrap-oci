@@ -137,7 +137,6 @@ read_bwrap_help ()
 
       value = g_strdup (it + 6);
       g_hash_table_insert (bwrap_options, value, value);
-      printf ("ADD VALUE %s\n", value);
     }
 
   g_free (output);
@@ -255,7 +254,9 @@ do_linux (struct context *con, JsonNode *rootval)
   if (json_object_has_member (root, "mountLabel"))
     {
       JsonNode *label = json_object_get_member (root, "mountLabel");
-      collect_options (con, "--mount-label", json_node_get_string (label), NULL);
+      if (bwrap_has_option ("--mount-label"))
+        collect_options (con, "--mount-label", json_node_get_string (label), NULL);
+      collect_options (con, "--file-label", json_node_get_string (label), NULL);
     }
   if (json_object_has_member (root, "seccomp"))
     {
