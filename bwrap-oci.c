@@ -30,6 +30,11 @@
 #include <errno.h>
 #include <glib/gprintf.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <gio/gunixinputstream.h>
+#include <libgen.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 static gboolean opt_dry_run;
 static gboolean opt_version;
@@ -43,6 +48,12 @@ static GOptionEntry entries[] =
   { NULL }
 };
 
+struct hook
+{
+  const char *path;
+  char **args;
+};
+
 struct context
 {
   GList *options;
@@ -51,6 +62,9 @@ struct context
   size_t total_elements;
   gboolean remount_ro_rootfs;
   scmp_filter_ctx seccomp;
+  gchar *rootfs;
+  GList *prestart_hooks;
+  GList *postfinish_hooks;
 };
 
 static uint32_t
@@ -175,6 +189,53 @@ collect_args (struct context *context, ...)
   va_start (valist, context);
   context->args = append_to_list (context, context->args, valist);
   va_end (valist);
+}
+
+static void
+do_hooks (struct context *con, JsonNode *rootval)
+{
+  const char *kind_name[2] = {"prestart", "postfinish"};
+  int kind;
+  JsonObject *root = json_node_get_object (rootval);
+  for (kind = 0; kind < 2; kind++)
+    {
+      JsonNode *namespaces;
+      GList *members;
+      GList *iter;
+      gsize i;
+      if (!json_object_has_member (root, kind_name[kind]))
+        continue;
+
+      namespaces = json_object_get_member (root, kind_name[kind]);
+      members = json_array_get_elements (json_node_get_array (namespaces));
+      for (iter = members; iter; iter = iter->next)
+        {
+          struct hook *hook = malloc (sizeof *hook);
+          GVariant *path, *args, *variant = json_gvariant_deserialize (iter->data, "a{sv}", NULL);
+
+          if (variant == NULL)
+            error (EXIT_FAILURE, 0, "error while deserializing hooks\n");
+
+          path = g_variant_lookup_value (variant, "path", G_VARIANT_TYPE_STRING);
+          if (path)
+            hook->path = g_variant_get_string (path, NULL);
+
+          args = g_variant_lookup_value (variant, "args", G_VARIANT_TYPE_ARRAY);
+          hook->args = malloc ((g_variant_n_children (args) + 1) * sizeof (char *));
+          for (i = 0; i < g_variant_n_children (args); i++)
+            {
+              char *val = NULL;
+              GVariant *child = g_variant_get_child_value (g_variant_get_child_value (args, i), 0);
+              g_variant_get (child, "s", &val);
+              hook->args[i] = val;
+            }
+          hook->args[i] = NULL;
+          if (kind == 0)
+            con->prestart_hooks = g_list_append (con->prestart_hooks, hook);
+          else
+            con->postfinish_hooks = g_list_append (con->postfinish_hooks, hook);
+        }
+    }
 }
 
 static void
@@ -379,6 +440,7 @@ do_root (struct context *con, JsonNode *rootval)
 
   collect_options (con, "--bind", json_node_get_string (path), "/", NULL);
 
+  con->rootfs = g_strdup (rootfs);
   if (readonly)
     {
       if (bwrap_has_option ("remount-ro"))
@@ -578,6 +640,43 @@ generate_bwrap_argv (struct context *context)
   return bwrap_argv;
 }
 
+static void
+run_hooks (GList *hooks, const char *stdin)
+{
+  GList *it;
+  size_t stdin_len = strlen (stdin);
+  for (it = hooks; it != NULL; it = it->next)
+    {
+      pid_t pid;
+      struct hook *hook = (struct hook *) it->data;
+      int pipes[2];
+      if (pipe (pipes) < 0)
+        error (EXIT_FAILURE, errno, "pipe");
+
+      pid = fork ();
+      if (pid < 0)
+        error (EXIT_FAILURE, errno, "pipe");
+      if (pid == 0)
+        {
+          int devnull = open ("/dev/null", O_RDWR);
+          close (pipes[1]);
+          dup2 (pipes[0], 0);
+          dup2 (devnull, 1);
+          dup2 (devnull, 2);
+          execv (hook->path, hook->args);
+          exit (EXIT_FAILURE);
+        }
+      else
+        {
+          int status;
+          close (pipes[0]);
+          write (pipes[1], stdin, stdin_len);
+          close (pipes[1]);
+          waitpid (pid, &status, WEXITED);
+        }
+    }
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -588,6 +687,9 @@ main (int argc, char *argv[])
   char **bwrap_argv = NULL;
   JsonParser *parser;
   GOptionContext *opt_context;
+  int block_fd[2];
+  int info_fd[2];
+  int sync_fd[2];
 
   opt_context = g_option_context_new ("- converter from OCI configuration to bubblewrap command line");
   g_option_context_add_main_entries (opt_context, entries, PACKAGE_STRING);
@@ -623,6 +725,12 @@ main (int argc, char *argv[])
   if (json_object_has_member (root, "linux"))
     do_linux (context, json_object_get_member (root, "linux"));
 
+  if (json_object_has_member (root, "hooks"))
+    {
+      if (bwrap_has_option ("block-fd") && bwrap_has_option ("info-fd"))
+        do_hooks (context, json_object_get_member (root, "hooks"));
+    }
+
   if (json_object_has_member (root, "mounts"))
     do_mounts (context, json_object_get_member (root, "mounts"));
 
@@ -631,10 +739,32 @@ main (int argc, char *argv[])
 
   g_object_unref (parser);
 
+  if (context->prestart_hooks || context->postfinish_hooks)
+    {
+      char pipe_fmt[16];
+      if (pipe (block_fd) != 0)
+        error (EXIT_FAILURE, errno, "pipe");
+
+      if (pipe (info_fd) != 0)
+        error (EXIT_FAILURE, errno, "pipe");
+
+      sprintf (pipe_fmt, "%i", block_fd[0]);
+      collect_options (context, "--block-fd", pipe_fmt, NULL);
+
+      sprintf (pipe_fmt, "%i", info_fd[1]);
+      collect_options (context, "--info-fd", pipe_fmt, NULL);
+
+      if (context->postfinish_hooks)
+        {
+          if (pipe (sync_fd) != 0)
+            error (EXIT_FAILURE, errno, "pipe");
+          sprintf (pipe_fmt, "%i", sync_fd[1]);
+          collect_options (context, "--sync-fd", pipe_fmt, NULL);
+        }
+  }
+
   finalize (context);
   bwrap_argv = generate_bwrap_argv (context);
-
-  g_free (context);
 
   if (opt_dry_run)
     {
@@ -642,7 +772,87 @@ main (int argc, char *argv[])
       return EXIT_SUCCESS;
     }
 
-  execv (BWRAP, bwrap_argv);
+  if (context->prestart_hooks == NULL && context->postfinish_hooks == NULL)
+    {
+      execv (BWRAP, bwrap_argv);
+    }
+  else
+    {
+      pid_t pid = fork ();
+      if (pid < 0)
+        error (EXIT_FAILURE, errno, "error forking");
+      if (pid == 0)
+        {
+          gchar *rootfs = context->rootfs;
+          gchar *stdin;
+          gchar *bundle_path;
+          gchar *id;
+          const char *fmt_stdin = "{\"ociVersion\":\"1.0\", \"id\":\"%s\", \"pid\":%i, \"root\":\"%s\", \"bundlePath\":\"%s\"}";
+
+          if (context->prestart_hooks)
+            {
+              close (info_fd[1]);
+              close (block_fd[0]);
+            }
+          if (context->postfinish_hooks)
+            close (sync_fd[1]);
+
+          setsid ();
+          if (fork () != 0)
+            exit (0);
+
+          id = basename (g_strdup (rootfs));
+          bundle_path = dirname (g_strdup (rootfs));
+
+          if (context->prestart_hooks)
+            {
+              JsonNode *rootval_info;
+              JsonObject *root_info;
+              JsonParser *parser_info;
+              GInputStream *stream;
+              gint64 pid;
+              parser_info = json_parser_new ();
+              stream = g_unix_input_stream_new (info_fd[0], TRUE);
+              json_parser_load_from_stream (parser_info, stream, NULL, &gerror);
+
+              rootval_info = json_parser_get_root (parser_info);
+              root_info = json_node_get_object (rootval_info);
+
+              pid = json_node_get_int (json_object_get_member (root_info, "child-pid"));
+              stdin = g_strdup_printf (fmt_stdin, id, pid, rootfs, bundle_path);
+              run_hooks (context->prestart_hooks, stdin);
+              g_free (stdin);
+              g_object_unref (stream);
+              g_object_unref (parser_info);
+
+              write (block_fd[1], "1", 1);
+            }
+
+          if (context->postfinish_hooks)
+            {
+              char b;
+              read (sync_fd[0], &b, 1);
+
+              stdin = g_strdup_printf (fmt_stdin, id, 0, rootfs, bundle_path);
+              run_hooks (context->postfinish_hooks, stdin);
+              g_free (stdin);
+            }
+
+          exit (0);
+        }
+      else
+        {
+          if (context->prestart_hooks)
+            {
+              close (info_fd[0]);
+              close (block_fd[1]);
+            }
+          if (context->postfinish_hooks)
+            close (sync_fd[0]);
+          execv (BWRAP, bwrap_argv);
+        }
+    return -1;
+  }
 
   return EXIT_FAILURE;
 }

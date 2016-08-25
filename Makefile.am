@@ -9,8 +9,8 @@ bwrap_oci_SOURCES = \
 	bwrap-oci.c \
 	$(NULL)
 
-bwrap_oci_CFLAGS = $(AM_CFLAGS) $(JSON_GLIB_CFLAGS)
-bwrap_oci_LDADD = $(SELINUX_LIBS) $(JSON_GLIB_LIBS)
+bwrap_oci_CFLAGS = $(AM_CFLAGS) $(JSON_GLIB_CFLAGS) $(GIO_UNIX_CFLAGS)
+bwrap_oci_LDADD = $(SELINUX_LIBS) $(JSON_GLIB_LIBS) $(GIO_UNIX_LIBS)
 
 -include $(top_srcdir)/git.mk
 
