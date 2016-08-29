@@ -3,7 +3,7 @@
 Summary: Core execution tool for unprivileged containers
 Name: bwrap-oci
 Version: 0.1.1
-Release: 1%{?dist}
+Release: 2%{?dist}
 Source0: https://github.com/projectatomic/%{name}/archive/%{name}-%{version}.tar.gz
 License: LGPLv2+
 URL: https://github.com/projectatomic/bwrap-oci
