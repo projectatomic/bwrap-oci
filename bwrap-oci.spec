@@ -1,12 +1,10 @@
-%global commit0 0000000000000000000000000000000000000000
-%global shortcommit0 %(c=%{commit0}; echo ${c:0:7})
+%global commit0 06ed9c9054db435ae33f0c917a2d5e7d3e40e6fa
 
 Summary: Core execution tool for unprivileged containers
 Name: bwrap-oci
 Version: 0.1.1
 Release: 1%{?dist}
-#VCS: git:https://github.com/projectatomic/bubblewrap
-Source0: https://github.com/projectatomic/%{name}/archive/%{commit0}.tar.gz#/%{name}-%{version}.tar.xz
+Source0: https://github.com/projectatomic/%{name}/archive/%{name}-%{version}.tar.gz
 License: LGPLv2+
 URL: https://github.com/projectatomic/bwrap-oci
 
