@@ -37,6 +37,29 @@
 #include <sys/wait.h>
 #include "safe-read-write.h"
 
+
+/***
+  This part is taken from systemd:
+
+  Copyright 2010 Lennart Poettering
+*/
+#if defined(__i386__) || defined(__x86_64__)
+
+/* The precise definition of __O_TMPFILE is arch specific, so let's
+ * just define this on x86 where we know the value. */
+
+#ifndef __O_TMPFILE
+#define __O_TMPFILE     020000000
+#endif
+
+/* a horrid kludge trying to make sure that this will fail on old kernels */
+#ifndef O_TMPFILE
+#define O_TMPFILE (__O_TMPFILE | O_DIRECTORY)
+#endif
+
+#endif
+
+
 static gboolean opt_dry_run;
 static gboolean opt_version;
 static const char *opt_configuration = "config.json";
