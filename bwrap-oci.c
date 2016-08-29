@@ -35,6 +35,7 @@
 #include <libgen.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include "safe-read-write.h"
 
 static gboolean opt_dry_run;
 static gboolean opt_version;
@@ -670,7 +671,8 @@ run_hooks (GList *hooks, const char *stdin)
         {
           int status;
           close (pipes[0]);
-          write (pipes[1], stdin, stdin_len);
+          if (safe_write (pipes[1], stdin, stdin_len) < 0)
+            error (0, errno, "error writing to hook process pipe");
           close (pipes[1]);
           waitpid (pid, &status, WEXITED);
         }
@@ -825,17 +827,21 @@ main (int argc, char *argv[])
               g_object_unref (stream);
               g_object_unref (parser_info);
 
-              write (block_fd[1], "1", 1);
+              if (safe_write (block_fd[1], "1", 1) < 0)
+                error (0, errno, "error while unblocking the bubblewrap process");
             }
 
           if (context->postfinish_hooks)
             {
               char b;
-              read (sync_fd[0], &b, 1);
-
-              stdin = g_strdup_printf (fmt_stdin, id, 0, rootfs, bundle_path);
-              run_hooks (context->postfinish_hooks, stdin);
-              g_free (stdin);
+              if (safe_read (sync_fd[0], &b, 1) < 0)
+                error (0, errno, "error while waiting for bubblewrap to terminate");
+              else
+                {
+                  stdin = g_strdup_printf (fmt_stdin, id, 0, rootfs, bundle_path);
+                  run_hooks (context->postfinish_hooks, stdin);
+                  g_free (stdin);
+                }
             }
 
           exit (0);
