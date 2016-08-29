@@ -21,5 +21,7 @@ TESTS = tests/bind.conf tests/cwd.conf tests/env.conf tests/hostname.conf \
 TEST_EXTENSIONS = .conf
 CONF_LOG_COMPILER = $(top_srcdir)/tests/tests-runner
 
-EXTRA_DIST = $(TESTS:.conf=.conf.expected)
+EXTRA_DIST = autogen.sh
+
+EXTRA_DIST += $(TESTS:.conf=.conf.expected)
 EXTRA_DIST += $(TESTS:.conf=.conf.command)
