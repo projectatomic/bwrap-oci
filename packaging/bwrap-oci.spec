@@ -16,6 +16,8 @@ BuildRequires: git
 BuildRequires: autoconf automake libtool
 BuildRequires: json-glib-devel
 BuildRequires: libseccomp-devel
+BuildRequires: libxslt
+BuildRequires: docbook-style-xsl
 
 %description
 bwrap-oci uses Bubblewrap to run a container from an OCI spec file.
@@ -36,4 +38,4 @@ find $RPM_BUILD_ROOT -name '*.la' -delete
 %files
 %license COPYING
 %{_bindir}/bwrap-oci
-
+%{_mandir}/man1/*

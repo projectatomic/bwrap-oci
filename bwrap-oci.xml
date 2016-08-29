@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.3//EN"
+               "http://www.oasis-open.org/docbook/xml/4.3/docbookx.dtd" [
+]>
+<refentry id="bwrap-oci">
+
+<refentryinfo>
+  <title>bwrap-oci</title>
+  <productname>Project Atomic</productname>
+  <authorgroup>
+    <author>
+      <contrib>Developer</contrib>
+      <firstname>Giuseppe</firstname>
+      <surname>Scrivano</surname>
+    </author>
+  </authorgroup>
+</refentryinfo>
+
+<refmeta>
+  <refentrytitle>bwrap-oci</refentrytitle>
+  <manvolnum>1</manvolnum>
+  <refmiscinfo class="manual">User Commands</refmiscinfo>
+</refmeta>
+
+<refnamediv>
+  <refname>bwrap-oci</refname>
+  <refpurpose>Run an OCI (Open Container Initiative) container through
+  bubblewrap.  bwrap-oci converts the OCI configuration file, a JSON
+  document which specifies how to run the container, to a command line
+  for bubblewrap.</refpurpose>
+</refnamediv>
+
+<refsynopsisdiv>
+<cmdsynopsis>
+<command>bwrap-oci</command>
+<arg choice="opt" rep="repeat"><replaceable>OPTION</replaceable></arg>
+<arg choice="opt"><replaceable>COMMAND</replaceable></arg>
+</cmdsynopsis>
+</refsynopsisdiv>
+
+<refsect1><title>Description</title>
+<para>
+  <command>bwrap-oci</command> converts an open containers spec file
+  to a command line for bubblewrap and run a container through it.
+</para>
+</refsect1>
+
+<refsect1><title>Options</title>
+  <para>General options:</para>
+  <variablelist>
+    <varlistentry>
+      <term><option>--help</option></term>
+      <listitem><para>Print help and exit</para></listitem>
+    </varlistentry>
+    <varlistentry>
+      <term><option>--configuration</option></term>
+      <listitem><para>Specify the configuration file to use.  If not specified
+      'configuration.json' is used.</para></listitem>
+    </varlistentry>
+    <varlistentry>
+      <term><option>--dry-run</option></term>
+      <listitem><para>
+        Print the command line used for bubblewrap but do not execute it.
+      </para></listitem>
+    </varlistentry>
+  </variablelist>
+</refsect1>
+
+</refentry>

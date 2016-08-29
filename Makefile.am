@@ -1,5 +1,22 @@
+XSLTPROC = xsltproc
+
+XSLTPROC_FLAGS = \
+	--nonet \
+	--stringparam man.output.quietly 1 \
+	--stringparam funcsynopsis.style ansi \
+	--stringparam man.th.extra1.suppress 1 \
+	--stringparam man.authors.section.enabled 0 \
+	--stringparam man.copyright.section.enabled 0
+
+.xml.1:
+	$(XSLTPROC) $(XSLTPROC_FLAGS) http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl $<
+
+
+man_MANS = bwrap-oci.1
+
+CLEANFILES = $(man_MANS)
+
 AM_CFLAGS = $(WARN_CFLAGS)
-CLEANFILES =
 
 GITIGNOREFILES = build-aux/ gtk-doc.make config.h.in aclocal.m4
 
@@ -21,7 +38,7 @@ TESTS = tests/bind.conf tests/cwd.conf tests/env.conf tests/hostname.conf \
 TEST_EXTENSIONS = .conf
 CONF_LOG_COMPILER = $(top_srcdir)/tests/tests-runner
 
-EXTRA_DIST = autogen.sh
+EXTRA_DIST = autogen.sh bwrap-oci.xml
 
 EXTRA_DIST += $(TESTS:.conf=.conf.expected)
 EXTRA_DIST += $(TESTS:.conf=.conf.command)
