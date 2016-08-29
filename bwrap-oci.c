@@ -156,6 +156,7 @@ read_bwrap_help ()
   const gchar *argv[] = {BWRAP, "--help", NULL};
   gchar *output = NULL;
   gint exit_status;
+  gchar *end, *it;
 
   if (g_spawn_sync (NULL, (gchar **) argv, NULL, G_SPAWN_DEFAULT, NULL,
                     NULL, &output, NULL, &exit_status, NULL) == FALSE)
@@ -165,7 +166,7 @@ read_bwrap_help ()
 
   bwrap_options = g_hash_table_new (g_str_hash, g_str_equal);
 
-  for (gchar *end, *it = strstr (output, "    --"); it; it = strstr (end + 1, "    --"))
+  for (it = strstr (output, "    --"); it; it = strstr (end + 1, "    --"))
     {
       gchar *value;
       end = strchr (it + 6, ' ');
