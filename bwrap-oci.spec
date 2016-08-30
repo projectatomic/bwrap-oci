@@ -15,6 +15,7 @@ BuildRequires: autoconf automake libtool
 BuildRequires: json-glib-devel
 BuildRequires: libseccomp-devel
 BuildRequires: libxslt
+BuildRequires: bubblewrap
 BuildRequires: docbook-style-xsl
 
 %description
