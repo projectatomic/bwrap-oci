@@ -1,40 +1,44 @@
-%global commit0 06ed9c9054db435ae33f0c917a2d5e7d3e40e6fa
-
 Summary: Core execution tool for unprivileged containers
 Name: bwrap-oci
 Version: 0.1.1
-Release: 3%{?dist}
-Source0: https://github.com/projectatomic/%{name}/archive/%{name}-%{version}.tar.gz
+%global rel 3
+Release: %{rel}%{?dist}
+Source0: %{url}/archive/%{name}-%{version}-%{rel}.tar.gz
 License: LGPLv2+
 URL: https://github.com/projectatomic/bwrap-oci
 
 Requires: bubblewrap
-BuildRequires: git
 # We always run autogen.sh
 BuildRequires: autoconf automake libtool
-BuildRequires: json-glib-devel
+BuildRequires: pkgconfig(json-glib-1.0)
 BuildRequires: libseccomp-devel
 BuildRequires: libxslt
 BuildRequires: bubblewrap
 BuildRequires: docbook-style-xsl
+BuildRequires: gcc
+BuildRequires: pkgconfig(gio-unix-2.0)
 
 %description
 bwrap-oci uses Bubblewrap to run a container from an OCI spec file.
 
 %prep
-%autosetup -Sgit -n %{name}-%{version}
+%autosetup -n %{name}-%{name}-%{version}-%{rel}
 
 %build
 env NOCONFIGURE=1 ./autogen.sh
 %configure --disable-silent-rules
 
-make %{?_smp_mflags}
+%make_build
 
 %install
-make install DESTDIR=$RPM_BUILD_ROOT INSTALL="install -p -c"
-find $RPM_BUILD_ROOT -name '*.la' -delete
+%make_install INSTALL="install -p"
 
 %files
 %license COPYING
 %{_bindir}/bwrap-oci
 %{_mandir}/man1/*
+
+
+%changelog
+* Fri Sep 02 2016 Giuseppe Scrivano <gscrivan@redhat.com> 0.1.1-3
+- Initial RPM release
