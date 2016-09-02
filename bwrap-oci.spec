@@ -36,4 +36,4 @@ env NOCONFIGURE=1 ./autogen.sh
 %files
 %license COPYING
 %{_bindir}/%{name}
-%%{_mandir}/man1/%{name}.1*
+%{_mandir}/man1/%{name}.1*
