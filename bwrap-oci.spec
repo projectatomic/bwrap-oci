@@ -1,4 +1,4 @@
-Summary: Core execution tool for unprivileged containers
+Summary: Run OCI containers with bubblewrap
 Name: bwrap-oci
 Version: 0.1.1
 %global rel 3
@@ -35,8 +35,8 @@ env NOCONFIGURE=1 ./autogen.sh
 
 %files
 %license COPYING
-%{_bindir}/bwrap-oci
-%{_mandir}/man1/*
+%{_bindir}/%{name}
+%%{_mandir}/man1/%{name}.1*
 
 
 %changelog
