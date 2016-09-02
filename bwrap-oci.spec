@@ -1,7 +1,7 @@
 Summary: Run OCI containers with bubblewrap
 Name: bwrap-oci
 Version: 0.1.1
-%global rel 3
+%global rel git
 Release: %{rel}%{?dist}
 Source0: %{url}/archive/%{name}-%{version}-%{rel}.tar.gz
 License: LGPLv2+
@@ -37,8 +37,3 @@ env NOCONFIGURE=1 ./autogen.sh
 %license COPYING
 %{_bindir}/%{name}
 %%{_mandir}/man1/%{name}.1*
-
-
-%changelog
-* Fri Sep 02 2016 Giuseppe Scrivano <gscrivan@redhat.com> 0.1.1-3
-- Initial RPM release
