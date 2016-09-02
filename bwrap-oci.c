@@ -825,7 +825,7 @@ main (int argc, char *argv[])
 
           setsid ();
           if (fork () != 0)
-            exit (0);
+            exit (EXIT_SUCCESS);
 
           id = basename (g_strdup (rootfs));
           bundle_path = dirname (g_strdup (rootfs));
@@ -868,7 +868,7 @@ main (int argc, char *argv[])
                 }
             }
 
-          exit (0);
+          exit (EXIT_SUCCESS);
         }
       else
         {
