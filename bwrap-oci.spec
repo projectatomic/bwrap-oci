@@ -1,15 +1,14 @@
 Summary: Run OCI containers with bubblewrap
 Name: bwrap-oci
 Version: 0.1.1
-%global rel git
-Release: %{rel}%{?dist}
-Source0: %{url}/archive/%{name}-%{version}-%{rel}.tar.gz
+Release: 5%{?dist}
+Source0: %{url}/archive/%{name}-%{version}.tar.gz
 License: LGPLv2+
 URL: https://github.com/projectatomic/bwrap-oci
 
 Requires: bubblewrap
 # We always run autogen.sh
-BuildRequires: autoconf automake libtool
+BuildRequires: autoconf automake
 BuildRequires: pkgconfig(json-glib-1.0)
 BuildRequires: libseccomp-devel
 BuildRequires: libxslt
@@ -22,7 +21,7 @@ BuildRequires: pkgconfig(gio-unix-2.0)
 bwrap-oci uses Bubblewrap to run a container from an OCI spec file.
 
 %prep
-%autosetup -n %{name}-%{name}-%{version}-%{rel}
+%autosetup -n %{name}-%{name}-%{version}
 
 %build
 env NOCONFIGURE=1 ./autogen.sh
