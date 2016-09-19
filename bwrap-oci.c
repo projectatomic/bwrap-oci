@@ -246,15 +246,21 @@ do_hooks (struct context *con, JsonNode *rootval)
             hook->path = g_variant_get_string (path, NULL);
 
           args = g_variant_lookup_value (variant, "args", G_VARIANT_TYPE_ARRAY);
-          hook->args = malloc ((g_variant_n_children (args) + 1) * sizeof (char *));
-          for (i = 0; i < g_variant_n_children (args); i++)
+
+          if (!args)
+            hook->args = NULL;
+          else
             {
-              char *val = NULL;
-              GVariant *child = g_variant_get_child_value (g_variant_get_child_value (args, i), 0);
-              g_variant_get (child, "s", &val);
-              hook->args[i] = val;
+              hook->args = malloc ((g_variant_n_children (args) + 1) * sizeof (char *));
+              for (i = 0; i < g_variant_n_children (args); i++)
+                {
+                  char *val = NULL;
+                  GVariant *child = g_variant_get_child_value (g_variant_get_child_value (args, i), 0);
+                  g_variant_get (child, "s", &val);
+                  hook->args[i] = val;
+                }
+              hook->args[i] = NULL;
             }
-          hook->args[i] = NULL;
           if (kind == 0)
             con->prestart_hooks = g_list_append (con->prestart_hooks, hook);
           else
