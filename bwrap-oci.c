@@ -88,7 +88,7 @@ struct context
   scmp_filter_ctx seccomp;
   gchar *rootfs;
   GList *prestart_hooks;
-  GList *postfinish_hooks;
+  GList *poststop_hooks;
 };
 
 static uint32_t
@@ -219,7 +219,7 @@ collect_args (struct context *context, ...)
 static void
 do_hooks (struct context *con, JsonNode *rootval)
 {
-  const char *kind_name[2] = {"prestart", "postfinish"};
+  const char *kind_name[2] = {"prestart", "poststop"};
   int kind;
   JsonObject *root = json_node_get_object (rootval);
   for (kind = 0; kind < 2; kind++)
@@ -264,7 +264,7 @@ do_hooks (struct context *con, JsonNode *rootval)
           if (kind == 0)
             con->prestart_hooks = g_list_append (con->prestart_hooks, hook);
           else
-            con->postfinish_hooks = g_list_append (con->postfinish_hooks, hook);
+            con->poststop_hooks = g_list_append (con->poststop_hooks, hook);
         }
     }
 }
@@ -771,7 +771,7 @@ main (int argc, char *argv[])
 
   g_object_unref (parser);
 
-  if (context->prestart_hooks || context->postfinish_hooks)
+  if (context->prestart_hooks || context->poststop_hooks)
     {
       char pipe_fmt[16];
       if (pipe (block_fd) != 0)
@@ -786,7 +786,7 @@ main (int argc, char *argv[])
       sprintf (pipe_fmt, "%i", info_fd[1]);
       collect_options (context, "--info-fd", pipe_fmt, NULL);
 
-      if (context->postfinish_hooks)
+      if (context->poststop_hooks)
         {
           if (pipe (sync_fd) != 0)
             error (EXIT_FAILURE, errno, "pipe");
@@ -804,7 +804,7 @@ main (int argc, char *argv[])
       return EXIT_SUCCESS;
     }
 
-  if (context->prestart_hooks == NULL && context->postfinish_hooks == NULL)
+  if (context->prestart_hooks == NULL && context->poststop_hooks == NULL)
     {
       execv (BWRAP, bwrap_argv);
     }
@@ -826,7 +826,7 @@ main (int argc, char *argv[])
               close (info_fd[1]);
               close (block_fd[0]);
             }
-          if (context->postfinish_hooks)
+          if (context->poststop_hooks)
             close (sync_fd[1]);
 
           setsid ();
@@ -861,7 +861,7 @@ main (int argc, char *argv[])
                 error (0, errno, "error while unblocking the bubblewrap process");
             }
 
-          if (context->postfinish_hooks)
+          if (context->poststop_hooks)
             {
               char b;
               if (safe_read (sync_fd[0], &b, 1) < 0)
@@ -869,21 +869,22 @@ main (int argc, char *argv[])
               else
                 {
                   stdin = g_strdup_printf (fmt_stdin, id, 0, rootfs, bundle_path);
-                  run_hooks (context->postfinish_hooks, stdin);
+                  run_hooks (context->poststop_hooks, stdin);
                   g_free (stdin);
                 }
             }
 
-          exit (EXIT_SUCCESS);
+          _exit (EXIT_SUCCESS);
         }
       else
         {
+          int status;
           if (context->prestart_hooks)
             {
               close (info_fd[0]);
               close (block_fd[1]);
             }
-          if (context->postfinish_hooks)
+          if (context->poststop_hooks)
             close (sync_fd[0]);
           execv (BWRAP, bwrap_argv);
         }
