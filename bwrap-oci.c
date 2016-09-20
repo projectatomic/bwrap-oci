@@ -704,7 +704,7 @@ run_hooks (GList *hooks, const char *stdin)
           if (safe_write (pipes[1], stdin, stdin_len) < 0)
             error (0, errno, "error writing to hook process pipe");
           close (pipes[1]);
-          waitpid (pid, &status, WEXITED);
+          while (waitpid (pid, &status, 0) < 0 && errno == EINTR);
         }
     }
 }
@@ -831,7 +831,7 @@ main (int argc, char *argv[])
 
           setsid ();
           if (fork () != 0)
-            exit (EXIT_SUCCESS);
+            _exit (EXIT_SUCCESS);
 
           id = basename (g_strdup (rootfs));
           bundle_path = dirname (g_strdup (rootfs));
@@ -886,6 +886,8 @@ main (int argc, char *argv[])
             }
           if (context->poststop_hooks)
             close (sync_fd[0]);
+
+          while (waitpid (pid, &status, 0) < 0 && errno == EINTR);
           execv (BWRAP, bwrap_argv);
         }
     return -1;
