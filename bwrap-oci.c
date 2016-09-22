@@ -515,12 +515,27 @@ do_mounts (struct context *con, JsonNode *rootval)
       else if (g_strcmp0 (typeval, "bind") == 0)
         {
           const char *sourceval = NULL;
-          GVariant *source;
+          GVariant *source, *options;
+          gboolean readonly = FALSE;
+
           source = g_variant_lookup_value (variant, "source", G_VARIANT_TYPE_STRING);
           if (! source)
             error (EXIT_FAILURE, 0, "invalid source for bind mount\n");
           sourceval = g_variant_get_string (source, NULL);
-          collect_options (con, "--bind", sourceval, destinationval, NULL);
+          options = g_variant_lookup_value (variant, "options", G_VARIANT_TYPE_ARRAY);
+          if (options)
+            {
+              gsize i;
+              for (i = 0; i < g_variant_n_children (options); i++)
+                {
+                  char *val = NULL;
+                  GVariant *child = g_variant_get_child_value (g_variant_get_child_value (options, i), 0);
+                  g_variant_get (child, "s", &val);
+                  if (g_strcmp0 (val, "ro") == 0)
+                    readonly = TRUE;
+                }
+            }
+          collect_options (con, readonly ? "--ro-bind" : "--bind", sourceval, destinationval, NULL);
         }
       else if (g_strcmp0 (typeval, "devtmpfs") == 0)
         collect_options (con, "--dev", destinationval, NULL);
