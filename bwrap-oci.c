@@ -484,6 +484,13 @@ do_root (struct context *con, JsonNode *rootval)
 }
 
 static void
+do_hostname (struct context *con, JsonNode *rootval)
+{
+  if (bwrap_has_option ("hostname"))
+    collect_options (con, "--hostname", json_node_get_string (rootval), NULL);
+}
+
+static void
 do_mounts (struct context *con, JsonNode *rootval)
 {
   GList *members;
@@ -782,6 +789,9 @@ main (int argc, char *argv[])
 
   if (json_object_has_member (root, "mounts"))
     do_mounts (context, json_object_get_member (root, "mounts"));
+
+  if (json_object_has_member (root, "hostname"))
+    do_hostname (context, json_object_get_member (root, "hostname"));
 
   if (json_object_has_member (root, "process"))
     do_process (context, json_object_get_member (root, "process"));
