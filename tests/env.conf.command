@@ -1,2 +1,2 @@
 #!/bin/sh
-ocitools generate --env=foo=bar --env=bar=baz --env=bar=foo
+oci-runtime-tool generate --env=foo=bar --env=bar=baz --env=bar=foo

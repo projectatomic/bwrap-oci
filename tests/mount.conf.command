@@ -1,2 +1,2 @@
 #!/bin/sh
-ocitools generate --mount=foo
+oci-runtime-tool generate --mount=foo

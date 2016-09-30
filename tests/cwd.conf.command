@@ -1,2 +1,2 @@
 #!/bin/sh
-ocitools generate --cwd=/usr/local/bin
+oci-runtime-tool generate --cwd=/usr/local/bin

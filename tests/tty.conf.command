@@ -1,3 +1,3 @@
 #!/bin/sh
-ocitools generate --tty
+oci-runtime-tool generate --tty
 

@@ -1,2 +1,2 @@
 #!/bin/sh
-ocitools generate --hostname=atomic
+oci-runtime-tool generate --hostname=atomic

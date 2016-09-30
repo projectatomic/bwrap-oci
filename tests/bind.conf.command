@@ -1,2 +1,2 @@
 #!/bin/sh
-ocitools generate --bind=foo:bar:rw
+oci-runtime-tool generate --bind=foo:bar:rw

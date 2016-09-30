@@ -1,2 +1,2 @@
 #!/bin/sh
-ocitools generate --mount-label=foo
+oci-runtime-tool generate --mount-label=foo

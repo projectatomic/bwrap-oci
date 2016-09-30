@@ -1,2 +1,2 @@
 #!/bin/sh
-ocitools generate --uid=10
+oci-runtime-tool generate --uid=10
