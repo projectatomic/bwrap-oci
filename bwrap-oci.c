@@ -63,12 +63,14 @@
 static gboolean opt_dry_run;
 static gboolean opt_version;
 static const char *opt_configuration = "config.json";
+static char *opt_bwrap = BWRAP;
 
 static GOptionEntry entries[] =
 {
   { "configuration", 'c', 0, G_OPTION_ARG_STRING, &opt_configuration, "Configuration file", "FILE" },
   { "dry-run", 'd', 0, G_OPTION_ARG_NONE, &opt_dry_run, "Print the command line for bubblewrap", NULL },
   { "version", 0, 0, G_OPTION_ARG_NONE, &opt_version, "Print version information and exit", NULL },
+  { "bwrap", 0, 0, G_OPTION_ARG_STRING, &opt_bwrap, "Specify the path to the bubblewrap executable to use", NULL },
   { NULL }
 };
 
@@ -153,7 +155,7 @@ static GHashTable *bwrap_options = NULL;
 static void
 read_bwrap_help ()
 {
-  const gchar *argv[] = {BWRAP, "--help", NULL};
+  const gchar *argv[] = {opt_bwrap, "--help", NULL};
   gchar *output = NULL;
   gint exit_status;
   gchar *end, *it;
@@ -672,7 +674,7 @@ generate_bwrap_argv (struct context *context)
   int current_list = 0;
   GList **lists[] = {&context->options, &context->readonly_paths, &context->args, NULL};
 
-  bwrap_argv[bwrap_argc++] = BWRAP;
+  bwrap_argv[bwrap_argc++] = opt_bwrap;
   while (lists[current_list])
     {
       GList *l = *lists[current_list];
@@ -821,7 +823,7 @@ main (int argc, char *argv[])
 
   if (context->prestart_hooks == NULL && context->poststop_hooks == NULL)
     {
-      execv (BWRAP, bwrap_argv);
+      execv (opt_bwrap, bwrap_argv);
     }
   else
     {
@@ -903,7 +905,7 @@ main (int argc, char *argv[])
             close (sync_fd[0]);
 
           while (waitpid (pid, &status, 0) < 0 && errno == EINTR);
-          execv (BWRAP, bwrap_argv);
+          execv (opt_bwrap, bwrap_argv);
         }
     return -1;
   }
