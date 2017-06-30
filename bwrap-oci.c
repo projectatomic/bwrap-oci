@@ -725,7 +725,19 @@ generate_seccomp_rules_file (struct context *context)
       char fdstr[10];
       int fd = open ("/tmp", O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR);
       if (fd < 0)
-        error (EXIT_FAILURE, errno, "error opening temp file");
+        {
+          if (errno != EOPNOTSUPP)
+            error (EXIT_FAILURE, errno, "error opening temp file");
+          else            
+            {
+              char *template = strdup ("/tmp/bwrap-oci-XXXXXX");
+              fd = mkstemp (template);
+              if (fd < 0)
+                error (EXIT_FAILURE, errno, "error opening temp file");
+              unlink (template);
+              free (template);
+            }
+        }
 
       if (seccomp_export_bpf (context->seccomp, fd) < 0)
         error (EXIT_FAILURE, errno, "error writing seccomp rules file");
