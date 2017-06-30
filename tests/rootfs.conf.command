@@ -1,2 +1,2 @@
 #!/bin/sh
-oci-runtime-tool generate --rootfs=rootfs
+oci-runtime-tool generate --rootfs-path=rootfs
