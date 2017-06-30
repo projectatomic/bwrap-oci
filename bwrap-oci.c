@@ -947,6 +947,9 @@ main (int argc, char *argv[])
   rootval = json_parser_get_root (parser);
   root = json_node_get_object (rootval);
 
+  if (bwrap_has_option ("as-pid-1"))
+    collect_options (context, "--as-pid-1", NULL);
+
   if (json_object_has_member (root, "root"))
     do_root (context, json_object_get_member (root, "root"));
 
