@@ -36,6 +36,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "safe-read-write.h"
+#include "subugidmap.h"
 
 
 /***
@@ -93,6 +94,16 @@ struct context
   gchar *rootfs;
   GList *prestart_hooks;
   GList *poststop_hooks;
+
+  uid_t uid;
+  gid_t gid;
+
+  gboolean has_user_mappings;
+
+  int userns_block_pipe[2];
+
+  uint32_t first_subuid, n_subuid;
+  uint32_t first_subgid, n_subgid;
 };
 
 static uint32_t
@@ -657,6 +668,7 @@ do_process (struct context *con, JsonNode *rootval)
           gint64 uid = json_node_get_int (json_object_get_member (userobj, "uid"));
           gchar *argument = g_strdup_printf ("%" G_GINT64_FORMAT, uid);
           collect_options (con, "--uid", argument, NULL);
+          con->uid = uid;
           g_free (argument);
         }
       if (json_object_has_member (userobj, "gid"))
@@ -664,6 +676,7 @@ do_process (struct context *con, JsonNode *rootval)
           gint64 gid = json_node_get_int (json_object_get_member (userobj, "gid"));
           gchar *argument = g_strdup_printf ("%" G_GINT64_FORMAT, gid);
           collect_options (con, "--gid", argument, NULL);
+          con->gid = gid;
           g_free (argument);
         }
     }
@@ -783,6 +796,112 @@ run_hooks (GList *hooks, const char *stdin)
     }
 }
 
+static gboolean
+initialize_user_mappings (struct context *context)
+{
+  char pipe_fmt[16];
+  gboolean has_subuid_map, has_subgid_map;
+
+  if (!bwrap_has_option ("userns-block-fd"))
+    {
+      context->has_user_mappings = FALSE;
+      return context->has_user_mappings;
+    }
+
+  has_subuid_map = getsubidrange (getuid (), TRUE, &context->first_subuid, &context->n_subuid) == 0 ? TRUE : FALSE;
+  has_subgid_map = getsubidrange (getgid (), FALSE, &context->first_subgid, &context->n_subgid) == 0 ? TRUE : FALSE;
+
+  if (has_subuid_map != has_subgid_map)
+    error (EXIT_FAILURE, 0, "invalid configuration for subuids and subgids");
+
+  context->has_user_mappings = has_subuid_map;
+
+  if (pipe (context->userns_block_pipe) < 0)
+    error (EXIT_FAILURE, errno, "pipe");
+
+  sprintf (pipe_fmt, "%i", context->userns_block_pipe[0]);
+
+  collect_options (context, "--userns-block-fd", pipe_fmt, NULL);
+  return context->has_user_mappings;
+}
+
+static void
+write_mapping (const char *program, pid_t pid, uint32_t host_id, uint32_t sandbox_id,
+               uint32_t first_subid, uint32_t n_subids)
+{
+  char arg_buffer[32][16];
+  const gchar *argv[32] = { 0 };
+  int argc = 0;
+  gint exit_status;
+
+#define APPEND_ARGUMENT(x)                        \
+  do                                              \
+    {                                             \
+      g_sprintf (arg_buffer[argc], "%i", x);      \
+      argv[argc] = arg_buffer[argc];              \
+      argc++;                                     \
+    } while (0)
+
+  argv[argc++] = program;
+  APPEND_ARGUMENT (pid);
+
+  if (sandbox_id == 0)
+    {
+      APPEND_ARGUMENT (sandbox_id);
+      APPEND_ARGUMENT (host_id);
+      APPEND_ARGUMENT (1);
+
+      APPEND_ARGUMENT (1);
+      APPEND_ARGUMENT (first_subid);
+      APPEND_ARGUMENT (n_subids);
+    }
+  else if (sandbox_id < n_subids)
+    {
+      APPEND_ARGUMENT (0);
+      APPEND_ARGUMENT (first_subid);
+      APPEND_ARGUMENT (sandbox_id);
+
+      APPEND_ARGUMENT (sandbox_id);
+      APPEND_ARGUMENT (host_id);
+      APPEND_ARGUMENT (1);
+
+      APPEND_ARGUMENT (sandbox_id + 1);
+      APPEND_ARGUMENT (first_subid + sandbox_id);
+      APPEND_ARGUMENT (n_subids - sandbox_id);
+    }
+  else
+    {
+      APPEND_ARGUMENT (0);
+      APPEND_ARGUMENT (first_subid);
+      APPEND_ARGUMENT (n_subids);
+
+      APPEND_ARGUMENT (sandbox_id);
+      APPEND_ARGUMENT (host_id);
+      APPEND_ARGUMENT (1);
+    }
+
+  argv[argc] = NULL;
+
+  if (g_spawn_sync (NULL, (gchar **) argv, NULL, G_SPAWN_DEFAULT, NULL,
+                    NULL, NULL, NULL, &exit_status, NULL) == FALSE ||
+      exit_status != 0)
+    {
+      error (EXIT_FAILURE, errno, "Error running %s", program);
+    }
+}
+
+static void
+write_user_group_mappings (struct context *context, pid_t pid)
+{
+  uid_t uid = getuid ();
+  gid_t gid = getgid ();
+
+  write_mapping ("/usr/bin/newuidmap", pid, uid, context->uid,
+                 context->first_subuid, context->n_subuid);
+  write_mapping ("/usr/bin/newgidmap", pid, gid, context->gid,
+                 context->first_subgid, context->n_subgid);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -822,6 +941,8 @@ main (int argc, char *argv[])
       g_object_unref (parser);
       return EXIT_FAILURE;
     }
+
+  need_info_fd |= initialize_user_mappings (context);
 
   rootval = json_parser_get_root (parser);
   root = json_node_get_object (rootval);
@@ -889,7 +1010,7 @@ main (int argc, char *argv[])
       return EXIT_SUCCESS;
     }
 
-  if (context->prestart_hooks == NULL && context->poststop_hooks == NULL)
+  if (context->prestart_hooks == NULL && context->poststop_hooks == NULL && !context->has_user_mappings)
     {
       execv (opt_bwrap, bwrap_argv);
     }
@@ -944,6 +1065,13 @@ main (int argc, char *argv[])
               g_object_unref (parser_info);
             }
 
+          if (context->has_user_mappings)
+            {
+              close (context->userns_block_pipe[0]);
+              write_user_group_mappings (context, child_pid);
+              safe_write (context->userns_block_pipe[1], "1", 1);
+            }
+
           if (context->prestart_hooks)
             {
               stdin = g_strdup_printf (fmt_stdin, id, child_pid, rootfs, bundle_path);
@@ -979,6 +1107,8 @@ main (int argc, char *argv[])
             }
           if (context->poststop_hooks)
             close (sync_fd[0]);
+          if (context->has_user_mappings)
+            close (context->userns_block_pipe[1]);
 
           while (waitpid (pid, &status, 0) < 0 && errno == EINTR);
           execv (opt_bwrap, bwrap_argv);
