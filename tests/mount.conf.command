@@ -1,2 +1,2 @@
 #!/bin/sh
-oci-runtime-tool generate --mount=foo
+oci-runtime-tool generate --bind=foo:bar
