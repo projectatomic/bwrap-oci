@@ -723,7 +723,7 @@ generate_seccomp_rules_file (struct context *context)
   if (context->seccomp)
     {
       char fdstr[10];
-      int fd = open (".", O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR);
+      int fd = open ("/tmp", O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR);
       if (fd < 0)
         error (EXIT_FAILURE, errno, "error opening temp file");
 
