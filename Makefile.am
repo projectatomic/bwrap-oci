@@ -34,6 +34,7 @@ bin_PROGRAMS = bwrap-oci
 bwrap_oci_SOURCES = \
 	bwrap-oci.c \
 	safe-read-write.c \
+	subugidmap.c \
 	$(NULL)
 
 bwrap_oci_CFLAGS = $(AM_CFLAGS) $(JSON_GLIB_CFLAGS) $(GIO_UNIX_CFLAGS)
