@@ -129,7 +129,7 @@ get_seccomp_operator (const char *name)
   return -1;
 }
 
-static uint32_t
+static guint64
 get_seccomp_action (const char *name)
 {
   if (g_strcmp0 (name, "SCMP_ACT_KILL") == 0)
@@ -376,7 +376,7 @@ do_linux (struct context *con, JsonNode *rootval)
       const char *defActionString = "SCMP_ACT_ALLOW";
 
       if (defaultAction)
-          defActionString = json_node_get_string (defaultAction);
+        defActionString = json_node_get_string (defaultAction);
 
       con->seccomp = seccomp_init (get_seccomp_action (defActionString));
       if (con->seccomp == NULL)
@@ -399,7 +399,7 @@ do_linux (struct context *con, JsonNode *rootval)
               arch_token = seccomp_arch_resolve_name (arch_lowercase);
               if (arch_token == 0)
                 error (EXIT_FAILURE, 0, "error while setting up seccomp, unknown architecture %s", arch_lowercase);
-              ret = seccomp_arch_add (con->seccomp, SCMP_ARCH_X86_64);
+              ret = seccomp_arch_add (con->seccomp, arch_token);
               if (ret < 0 && ret != -EEXIST)
                 error (EXIT_FAILURE, errno, "error while setting up seccomp");
               g_free (arch_lowercase);
@@ -409,65 +409,75 @@ do_linux (struct context *con, JsonNode *rootval)
       members = json_array_get_elements (json_node_get_array (syscalls));
       for (iter = members; iter; iter = iter->next)
         {
-          GArray *args_array = NULL;
           gsize child;
-          GVariant *namevar, *actionvar, *args;
+          int name_it;
+          GVariant *names, *actionvar, *args;
           const char *name = NULL, *action = NULL;
           GVariant *variant = json_gvariant_deserialize (iter->data, "a{sv}", NULL);
 
-          namevar = g_variant_lookup_value (variant, "name", G_VARIANT_TYPE_STRING);
           actionvar = g_variant_lookup_value (variant, "action", G_VARIANT_TYPE_STRING);
-          name = g_variant_get_string (namevar, NULL);
           action = g_variant_get_string (actionvar, NULL);
           args = g_variant_lookup_value (variant, "args", G_VARIANT_TYPE_ARRAY);
 
-          if (args == NULL)
+          names = g_variant_lookup_value (variant, "names", G_VARIANT_TYPE_ARRAY);
+
+          for (name_it = 0; name_it < g_variant_n_children (names); name_it++)
             {
-              if (seccomp_rule_add (con->seccomp,
-                                    get_seccomp_action (action),
-                                    seccomp_syscall_resolve_name (name), 0) < 0)
+              char *name = NULL;
+              GVariant *name_variant = g_variant_get_child_value (g_variant_get_child_value (names, name_it), 0);
+              g_variant_get (name_variant, "s", &name);
+              if (args == NULL)
                 {
-                  error (EXIT_FAILURE, 0, "error while setting up seccomp");
+                  if (seccomp_rule_add (con->seccomp,
+                                        get_seccomp_action (action),
+                                        seccomp_syscall_resolve_name (name), 0) < 0)
+                    {
+                      error (EXIT_FAILURE, 0, "error while setting up seccomp");
+                    }
                 }
-            }
-          else
-            {
-              args_array = g_array_new (FALSE, FALSE, sizeof (struct scmp_arg_cmp));
-              for (child = 0; args_array && child < g_variant_n_children (args); child++)
+              else
                 {
-                  struct scmp_arg_cmp arg_cmp;
-                  GVariant *indexvar, *valuevar, *valueTwovar, *opvar;
-                  guint64 index, value, valueTwo;
-                  const char *op = NULL;
-                  GVariant *arg = g_variant_get_variant (g_variant_get_child_value (args, child));
+                  int ret;
+                  size_t n_arg = 0;
+                  struct scmp_arg_cmp arg_cmp[6];
 
-                  indexvar = g_variant_lookup_value (arg, "index", G_VARIANT_TYPE_INT64);
-                  index = g_variant_get_int64 (indexvar);
-                  valuevar = g_variant_lookup_value (arg, "value", G_VARIANT_TYPE_INT64);
-                  value = g_variant_get_int64 (valuevar);
-                  valueTwovar = g_variant_lookup_value (arg, "valueTwo", G_VARIANT_TYPE_INT64);
-                  valueTwo = g_variant_get_int64 (valueTwovar);
-                  opvar = g_variant_lookup_value (arg, "op", G_VARIANT_TYPE_STRING);
-                  op = g_variant_get_string (opvar, NULL);
+                  for (child = 0; child < 6 && child < g_variant_n_children (args); child++)
+                    {
+                      GVariant *indexvar, *valuevar, *valueTwovar, *opvar;
+                      guint64 index, value, valueTwo;
+                      const char *op = NULL;
+                      GVariant *arg = g_variant_get_variant (g_variant_get_child_value (args, child));
 
-                  arg_cmp.arg = index;
-                  arg_cmp.op = get_seccomp_operator (op);
-                  arg_cmp.datum_a = value;
-                  arg_cmp.datum_b = valueTwo;
+                      indexvar = g_variant_lookup_value (arg, "index", G_VARIANT_TYPE_INT64);
+                      index = g_variant_get_int64 (indexvar);
+                      valuevar = g_variant_lookup_value (arg, "value", G_VARIANT_TYPE_INT64);
+                      value = g_variant_get_int64 (valuevar);
+                      valueTwovar = g_variant_lookup_value (arg, "valueTwo", G_VARIANT_TYPE_INT64);
+                      valueTwo = g_variant_get_int64 (valueTwovar);
+                      opvar = g_variant_lookup_value (arg, "op", G_VARIANT_TYPE_STRING);
+                      op = g_variant_get_string (opvar, NULL);
 
-                  g_array_append_val (args_array, arg_cmp);
+                      arg_cmp[n_arg].arg = n_arg;
+                      arg_cmp[n_arg].op = get_seccomp_operator (op);
+                      arg_cmp[n_arg].datum_a = value;
+                      arg_cmp[n_arg].datum_b = valueTwo;
+                      n_arg++;
+                    }
+
+                  ret = seccomp_rule_add_array (con->seccomp,
+                                                get_seccomp_action (action),
+                                                seccomp_syscall_resolve_name (name),
+                                                n_arg,
+                                                arg_cmp);
+                  if (ret < 0)
+                    {
+                      error (EXIT_FAILURE, -ret, "error while setting up seccomp");
+                    }
+
                 }
 
-              if (seccomp_rule_add_array (con->seccomp,
-                                          get_seccomp_action (action),
-                                          seccomp_syscall_resolve_name (name),
-                                          args_array->len,
-                                          (const struct scmp_arg_cmp *) args_array->data) < 0)
-                {
-                  error (EXIT_FAILURE, 0, "error while setting up seccomp");
-                }
-
-                g_array_free (args_array, TRUE);
+              g_free (name);
+              g_variant_unref (name_variant);
             }
         }
     }
