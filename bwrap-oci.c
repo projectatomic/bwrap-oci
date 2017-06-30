@@ -1,5 +1,5 @@
 /* bubblewrap-oci
- * Copyright (C) 2016 Giuseppe Scrivano
+ * Copyright (C) 2016, 2017 Giuseppe Scrivano
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -62,6 +62,7 @@
 
 static gboolean opt_dry_run;
 static gboolean opt_version;
+static gboolean opt_enable_hooks;
 static const char *opt_configuration = "config.json";
 static char *opt_bwrap = BWRAP;
 
@@ -69,6 +70,7 @@ static GOptionEntry entries[] =
 {
   { "configuration", 'c', 0, G_OPTION_ARG_STRING, &opt_configuration, "Configuration file", "FILE" },
   { "dry-run", 'd', 0, G_OPTION_ARG_NONE, &opt_dry_run, "Print the command line for bubblewrap", NULL },
+  { "enable-hooks", 0, 0, G_OPTION_ARG_NONE, &opt_enable_hooks, "Execute the OCI hooks", NULL },
   { "version", 0, 0, G_OPTION_ARG_NONE, &opt_version, "Print version information and exit", NULL },
   { "bwrap", 0, 0, G_OPTION_ARG_STRING, &opt_bwrap, "Specify the path to the bubblewrap executable to use", NULL },
   { NULL }
@@ -781,7 +783,7 @@ main (int argc, char *argv[])
   if (json_object_has_member (root, "linux"))
     do_linux (context, json_object_get_member (root, "linux"));
 
-  if (json_object_has_member (root, "hooks"))
+  if (opt_enable_hooks && json_object_has_member (root, "hooks"))
     {
       if (bwrap_has_option ("block-fd") && bwrap_has_option ("info-fd"))
         do_hooks (context, json_object_get_member (root, "hooks"));
