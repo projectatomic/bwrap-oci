@@ -20,4 +20,4 @@ if test "x${REGENERATE_TESTS_DATA-}" != x; then
     exit 0
 fi
 
-cmp $TMP_DIR/output $1.expected
+diff -Naur $1.expected $TMP_DIR/output
