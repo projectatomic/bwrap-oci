@@ -563,9 +563,57 @@ do_mounts (struct context *con, JsonNode *rootval)
 }
 
 static void
+do_capabilities (struct context *con, JsonNode *rootval)
+{
+  JsonNode *caps;
+  JsonObject *root = json_node_get_object (rootval);
+  const char *kind_name[5] = {"bounding", "effective", "inheritable", "ambient", "permitted"};
+  GList *members;
+  GList *iter;
+  int kind;
+  GHashTable *needed_caps = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+
+  for (kind = 0; kind < 5; kind++)
+    {
+      caps = json_object_get_member (root, kind_name[kind]);
+      members = json_array_get_elements (json_node_get_array (caps));
+      for (iter = members; iter; iter = iter->next)
+        {
+          GVariant *v = json_gvariant_deserialize (iter->data, "s", NULL);
+          const char *cap = g_variant_get_string (v, NULL);
+
+          g_hash_table_insert (needed_caps, g_strdup (cap), g_strdup (cap));
+          g_variant_unref (v);
+        }
+    }
+
+  {
+    GHashTableIter iter;
+    gpointer key, value;
+    gboolean unshared_user = FALSE;
+    g_hash_table_iter_init (&iter, needed_caps);
+    while (g_hash_table_iter_next (&iter, &key, &value))
+      {
+        if (! unshared_user)
+          {
+            collect_options (con, "--unshare-user", NULL);
+            unshared_user = TRUE;
+          }
+        collect_options (con, "--cap-add", value, NULL);
+      }
+  }
+  g_hash_table_unref (needed_caps);
+}
+
+static void
 do_process (struct context *con, JsonNode *rootval)
 {
   JsonObject *root = json_node_get_object (rootval);
+  if (json_object_has_member (root, "capabilities") && bwrap_has_option ("cap-add"))
+    {
+      JsonNode *capabilities = json_object_get_member (root, "capabilities");
+      do_capabilities (con, capabilities);
+    }
   if (json_object_has_member (root, "terminal"))
     {
       gboolean terminal = json_node_get_boolean (json_object_get_member (root, "terminal"));
