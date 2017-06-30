@@ -796,6 +796,7 @@ main (int argc, char *argv[])
   int block_fd[2];
   int info_fd[2];
   int sync_fd[2];
+  gboolean need_info_fd = FALSE;
 
   opt_context = g_option_context_new ("- converter from OCI configuration to bubblewrap command line");
   g_option_context_add_main_entries (opt_context, entries, PACKAGE_STRING);
@@ -854,14 +855,10 @@ main (int argc, char *argv[])
       if (pipe (block_fd) != 0)
         error (EXIT_FAILURE, errno, "pipe");
 
-      if (pipe (info_fd) != 0)
-        error (EXIT_FAILURE, errno, "pipe");
-
       sprintf (pipe_fmt, "%i", block_fd[0]);
       collect_options (context, "--block-fd", pipe_fmt, NULL);
 
-      sprintf (pipe_fmt, "%i", info_fd[1]);
-      collect_options (context, "--info-fd", pipe_fmt, NULL);
+      need_info_fd = TRUE;
 
       if (context->poststop_hooks)
         {
@@ -870,6 +867,17 @@ main (int argc, char *argv[])
           sprintf (pipe_fmt, "%i", sync_fd[1]);
           collect_options (context, "--sync-fd", pipe_fmt, NULL);
         }
+  }
+
+  if (need_info_fd)
+    {
+      char pipe_fmt[16];
+
+      if (pipe (info_fd) != 0)
+        error (EXIT_FAILURE, errno, "pipe");
+
+      sprintf (pipe_fmt, "%i", info_fd[1]);
+      collect_options (context, "--info-fd", pipe_fmt, NULL);
   }
 
   finalize (context);
@@ -896,11 +904,15 @@ main (int argc, char *argv[])
           gchar *stdin;
           gchar *bundle_path;
           gchar *id;
+          gint64 child_pid = 0;
           const char *fmt_stdin = "{\"ociVersion\":\"1.0\", \"id\":\"%s\", \"pid\":%i, \"root\":\"%s\", \"bundlePath\":\"%s\"}";
 
-          if (context->prestart_hooks)
+          if (need_info_fd)
             {
               close (info_fd[1]);
+            }
+          if (context->prestart_hooks)
+            {
               close (block_fd[0]);
             }
           if (context->poststop_hooks)
@@ -913,13 +925,12 @@ main (int argc, char *argv[])
           id = basename (g_strdup (rootfs));
           bundle_path = dirname (g_strdup (rootfs));
 
-          if (context->prestart_hooks)
+          if (need_info_fd)
             {
               JsonNode *rootval_info;
               JsonObject *root_info;
               JsonParser *parser_info;
               GInputStream *stream;
-              gint64 pid;
               parser_info = json_parser_new ();
               stream = g_unix_input_stream_new (info_fd[0], TRUE);
               json_parser_load_from_stream (parser_info, stream, NULL, &gerror);
@@ -927,12 +938,17 @@ main (int argc, char *argv[])
               rootval_info = json_parser_get_root (parser_info);
               root_info = json_node_get_object (rootval_info);
 
-              pid = json_node_get_int (json_object_get_member (root_info, "child-pid"));
-              stdin = g_strdup_printf (fmt_stdin, id, pid, rootfs, bundle_path);
-              run_hooks (context->prestart_hooks, stdin);
-              g_free (stdin);
+              child_pid = json_node_get_int (json_object_get_member (root_info, "child-pid"));
+
               g_object_unref (stream);
               g_object_unref (parser_info);
+            }
+
+          if (context->prestart_hooks)
+            {
+              stdin = g_strdup_printf (fmt_stdin, id, child_pid, rootfs, bundle_path);
+              run_hooks (context->prestart_hooks, stdin);
+              g_free (stdin);
 
               if (safe_write (block_fd[1], "1", 1) < 0)
                 error (0, errno, "error while unblocking the bubblewrap process");
