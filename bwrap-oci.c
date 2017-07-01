@@ -106,6 +106,15 @@ struct context
   uint32_t first_subgid, n_subgid;
 };
 
+static void
+format_fd (gchar *buf, int fd)
+{
+  if (opt_dry_run)
+    g_sprintf (buf, "FD");
+  else
+    g_sprintf (buf, "%i", fd);
+}
+
 static uint32_t
 get_seccomp_operator (const char *name)
 {
@@ -745,7 +754,7 @@ generate_seccomp_rules_file (struct context *context)
       if (lseek (fd, 0, SEEK_SET) < 0)
         error (EXIT_FAILURE, errno, "error seeking seccomp rules file");
 
-      g_sprintf (fdstr, "%i", fd);
+      format_fd (fdstr, fd);
       collect_options (context, "--seccomp", fdstr);
     }
 }
@@ -842,7 +851,7 @@ initialize_user_mappings (struct context *context)
   if (pipe (context->userns_block_pipe) < 0)
     error (EXIT_FAILURE, errno, "pipe");
 
-  sprintf (pipe_fmt, "%i", context->userns_block_pipe[0]);
+  format_fd (pipe_fmt, context->userns_block_pipe[0]);
 
   collect_options (context, "--userns-block-fd", pipe_fmt, NULL);
   return context->has_user_mappings;
@@ -1002,7 +1011,7 @@ main (int argc, char *argv[])
       if (pipe (block_fd) != 0)
         error (EXIT_FAILURE, errno, "pipe");
 
-      sprintf (pipe_fmt, "%i", block_fd[0]);
+      format_fd (pipe_fmt, block_fd[0]);
       collect_options (context, "--block-fd", pipe_fmt, NULL);
 
       need_info_fd = TRUE;
@@ -1011,7 +1020,7 @@ main (int argc, char *argv[])
         {
           if (pipe (sync_fd) != 0)
             error (EXIT_FAILURE, errno, "pipe");
-          sprintf (pipe_fmt, "%i", sync_fd[1]);
+          format_fd (pipe_fmt, sync_fd[1]);
           collect_options (context, "--sync-fd", pipe_fmt, NULL);
         }
   }
@@ -1023,7 +1032,7 @@ main (int argc, char *argv[])
       if (pipe (info_fd) != 0)
         error (EXIT_FAILURE, errno, "pipe");
 
-      sprintf (pipe_fmt, "%i", info_fd[1]);
+      format_fd (pipe_fmt, info_fd[1]);
       collect_options (context, "--info-fd", pipe_fmt, NULL);
   }
 
