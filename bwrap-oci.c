@@ -73,7 +73,7 @@ static GOptionEntry entries[] =
   { "dry-run", 'd', 0, G_OPTION_ARG_NONE, &opt_dry_run, "Print the command line for bubblewrap", NULL },
   { "enable-hooks", 0, 0, G_OPTION_ARG_NONE, &opt_enable_hooks, "Execute the OCI hooks", NULL },
   { "version", 0, 0, G_OPTION_ARG_NONE, &opt_version, "Print version information and exit", NULL },
-  { "bwrap", 0, 0, G_OPTION_ARG_STRING, &opt_bwrap, "Specify the path to the bubblewrap executable to use", NULL },
+  { "bwrap", 0, 0, G_OPTION_ARG_STRING, &opt_bwrap, "Specify the path to the bubblewrap executable to use", "PATH" },
   { NULL }
 };
 
