@@ -611,14 +611,15 @@ do_capabilities (struct context *con, JsonNode *rootval)
   {
     GHashTableIter iter;
     gpointer key, value;
-    gboolean unshared_user = FALSE;
+    gboolean caps_initialized = FALSE;
     g_hash_table_iter_init (&iter, needed_caps);
     while (g_hash_table_iter_next (&iter, &key, &value))
       {
-        if (! unshared_user)
+        if (! caps_initialized)
           {
             collect_options (con, "--unshare-user", NULL);
-            unshared_user = TRUE;
+            collect_options (con, "--cap-drop", "ALL", NULL);
+            caps_initialized = TRUE;
           }
         collect_options (con, "--cap-add", value, NULL);
       }
