@@ -421,7 +421,7 @@ do_linux (struct context *con, JsonNode *rootval)
           gsize child;
           int name_it;
           GVariant *names, *actionvar, *args;
-          const char *name = NULL, *action = NULL;
+          const char *action = NULL;
           GVariant *variant = json_gvariant_deserialize (iter->data, "a{sv}", NULL);
 
           actionvar = g_variant_lookup_value (variant, "action", G_VARIANT_TYPE_STRING);
@@ -452,13 +452,11 @@ do_linux (struct context *con, JsonNode *rootval)
 
                   for (child = 0; child < 6 && child < g_variant_n_children (args); child++)
                     {
-                      GVariant *indexvar, *valuevar, *valueTwovar, *opvar;
-                      guint64 index, value, valueTwo;
+                      GVariant *valuevar, *valueTwovar, *opvar;
+                      guint64 value, valueTwo;
                       const char *op = NULL;
                       GVariant *arg = g_variant_get_variant (g_variant_get_child_value (args, child));
 
-                      indexvar = g_variant_lookup_value (arg, "index", G_VARIANT_TYPE_INT64);
-                      index = g_variant_get_int64 (indexvar);
                       valuevar = g_variant_lookup_value (arg, "value", G_VARIANT_TYPE_INT64);
                       value = g_variant_get_int64 (valuevar);
                       valueTwovar = g_variant_lookup_value (arg, "valueTwo", G_VARIANT_TYPE_INT64);
