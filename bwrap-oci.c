@@ -581,7 +581,7 @@ do_mounts (struct context *con, JsonNode *rootval)
       else if (g_strcmp0 (typeval, "cgroup") == 0)
         ;
       else if (g_strcmp0 (typeval, "devpts") == 0)
-        ;
+        collect_options (con, "--bind", "/dev/pts", destinationval, NULL);
       else if (g_strcmp0 (typeval, "sysfs") == 0)
         ;
       else
