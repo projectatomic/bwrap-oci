@@ -595,7 +595,13 @@ do_mounts (struct context *con, JsonNode *rootval)
       else if (g_strcmp0 (typeval, "devpts") == 0)
         collect_options (con, "--bind", "/dev/pts", destinationval, NULL);
       else if (g_strcmp0 (typeval, "sysfs") == 0)
-        ;
+        {
+          GVariant *options;
+          gboolean readonly = FALSE;
+          options = g_variant_lookup_value (variant, "options", G_VARIANT_TYPE_ARRAY);
+          readonly = find_child_value (options, "ro");
+          collect_options (con, readonly ? "--ro-bind" : "--bind", "/sys", destinationval, NULL);
+        }
       else
         error (EXIT_FAILURE, 0, "unknown mount type %s\n", typeval);
       g_variant_unref (variant);
