@@ -585,7 +585,13 @@ do_mounts (struct context *con, JsonNode *rootval)
       else if (g_strcmp0 (typeval, "devtmpfs") == 0)
         collect_options (con, "--dev", destinationval, NULL);
       else if (g_strcmp0 (typeval, "cgroup") == 0)
-        ;
+        {
+          GVariant *options;
+          gboolean readonly = FALSE;
+          options = g_variant_lookup_value (variant, "options", G_VARIANT_TYPE_ARRAY);
+          readonly = find_child_value (options, "ro");
+          collect_options (con, readonly ? "--ro-bind" : "--bind", "/sys/fs/cgroup", destinationval, NULL);
+        }
       else if (g_strcmp0 (typeval, "devpts") == 0)
         collect_options (con, "--bind", "/dev/pts", destinationval, NULL);
       else if (g_strcmp0 (typeval, "sysfs") == 0)
