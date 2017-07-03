@@ -609,7 +609,12 @@ do_mounts (struct context *con, JsonNode *rootval)
       else if (g_strcmp0 (typeval, "mqueue") == 0)
         collect_options (con, "--mqueue", destinationval, NULL);
       else if (g_strcmp0 (typeval, "tmpfs") == 0)
-        collect_options (con, "--tmpfs", destinationval, NULL);
+        {
+          if (g_strcmp0 (destinationval, "/dev") == 0)
+            collect_options (con, "--dev", destinationval, NULL);
+          else
+            collect_options (con, "--tmpfs", destinationval, NULL);
+        }
       else if (g_strcmp0 (typeval, "bind") == 0)
         {
           const char *sourceval = NULL;
