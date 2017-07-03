@@ -104,6 +104,8 @@ struct context
 
   uint32_t first_subuid, n_subuid;
   uint32_t first_subgid, n_subgid;
+
+  gboolean has_terminal;
 };
 
 static void
@@ -537,11 +539,23 @@ find_child_value (GVariant *root, const char *value)
     }
   return FALSE;
 }
+
+static void
+check_required_mounts (struct context *con, GHashTable *mounts)
+{
+    if (! g_hash_table_contains (mounts, "/tmp"))
+      collect_options (con, "--tmpfs", "/tmp", NULL);
+    if (con->has_terminal)
+      collect_options (con, "--dev-bind", "/dev/tty", "/dev/tty", NULL);
+}
+
 static void
 do_mounts (struct context *con, JsonNode *rootval)
 {
   GList *members;
   GList *iter;
+  GHashTable *explicit_mounts = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+
   members = json_array_get_elements (json_node_get_array (rootval));
   for (iter = members; iter; iter = iter->next)
     {
@@ -561,6 +575,8 @@ do_mounts (struct context *con, JsonNode *rootval)
 
       if (typeval == NULL || destinationval == NULL)
         error (EXIT_FAILURE, 0, "invalid mount type or destination\n");
+
+      g_hash_table_insert (explicit_mounts, g_strdup (destinationval), g_strdup (destinationval));
 
       if (g_strcmp0 (typeval, "proc") == 0)
         collect_options (con, "--proc", destinationval, NULL);
@@ -606,6 +622,10 @@ do_mounts (struct context *con, JsonNode *rootval)
         error (EXIT_FAILURE, 0, "unknown mount type %s\n", typeval);
       g_variant_unref (variant);
     }
+
+  check_required_mounts (con, explicit_mounts);
+
+  g_hash_table_unref (explicit_mounts);
 }
 
 static void
@@ -663,9 +683,7 @@ do_process (struct context *con, JsonNode *rootval)
     }
   if (json_object_has_member (root, "terminal"))
     {
-      gboolean terminal = json_node_get_boolean (json_object_get_member (root, "terminal"));
-      if (terminal)
-        collect_options (con, "--dev-bind", "/dev/tty", "/dev/tty", NULL);
+      con->has_terminal = json_node_get_boolean (json_object_get_member (root, "terminal"));
     }
   if (json_object_has_member (root, "cwd"))
     {
@@ -754,7 +772,7 @@ generate_seccomp_rules_file (struct context *context)
         {
           if (errno != EOPNOTSUPP)
             error (EXIT_FAILURE, errno, "error opening temp file");
-          else            
+          else
             {
               char *template = strdup ("/tmp/bwrap-oci-XXXXXX");
               fd = mkstemp (template);
@@ -1010,14 +1028,14 @@ main (int argc, char *argv[])
         do_hooks (context, json_object_get_member (root, "hooks"));
     }
 
+  if (json_object_has_member (root, "process"))
+    do_process (context, json_object_get_member (root, "process"));
+
   if (json_object_has_member (root, "mounts"))
     do_mounts (context, json_object_get_member (root, "mounts"));
 
   if (json_object_has_member (root, "hostname"))
     do_hostname (context, json_object_get_member (root, "hostname"));
-
-  if (json_object_has_member (root, "process"))
-    do_process (context, json_object_get_member (root, "process"));
 
   g_object_unref (parser);
 
