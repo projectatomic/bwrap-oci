@@ -683,6 +683,7 @@ do_capabilities (struct context *con, JsonNode *rootval)
           g_hash_table_insert (needed_caps, g_strdup (cap), g_strdup (cap));
           g_variant_unref (v);
         }
+      g_list_free (members);
     }
 
   {
@@ -741,6 +742,7 @@ do_process (struct context *con, JsonNode *rootval)
           g_free (val);
           g_variant_unref (env);
         }
+      g_list_free (members);
     }
   if (json_object_has_member (root, "selinuxLabel"))
     {
@@ -779,6 +781,7 @@ do_process (struct context *con, JsonNode *rootval)
           const char *val = g_variant_get_string (arg, NULL);
           collect_args (con, val, NULL);
         }
+      g_list_free (members);
     }
 }
 
@@ -855,6 +858,11 @@ generate_bwrap_argv (struct context *context)
         }
       current_list++;
     }
+
+  g_list_free (context->options);
+  g_list_free (context->readonly_paths);
+  g_list_free (context->args);
+  context->options = context->readonly_paths = context->args = NULL;
   return bwrap_argv;
 }
 
