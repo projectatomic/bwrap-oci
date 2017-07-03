@@ -106,6 +106,7 @@ struct context
   uint32_t first_subgid, n_subgid;
 
   gboolean has_terminal;
+  gboolean has_container_env;
 };
 
 static void
@@ -550,6 +551,31 @@ check_required_mounts (struct context *con, GHashTable *mounts)
 }
 
 static void
+check_systemd_required_mounts (struct context *con, GHashTable *mounts)
+{
+  gboolean is_systemd = FALSE;
+  if (con->args != NULL && con->args->next != NULL)
+    is_systemd = g_strcmp0 (con->args->data, "/usr/lib/systemd/systemd") == 0 && g_strcmp0 (con->args->next->data, "--system") == 0;
+  if (! is_systemd)
+    return;
+
+  if (! g_hash_table_contains (mounts, "/sys/fs/cgroup/systemd"))
+    collect_options (con, "--bind", "/sys/fs/cgroup/systemd", "/sys/fs/cgroup/systemd", NULL);
+
+  if (! g_hash_table_contains (mounts, "/var/lib"))
+      collect_options (con, "--tmpfs", "/var/lib", NULL);
+
+  if (! g_hash_table_contains (mounts, "/var/log"))
+      collect_options (con, "--tmpfs", "/var/log", NULL);
+
+  if (! g_hash_table_contains (mounts, "/var/tmp"))
+      collect_options (con, "--tmpfs", "/var/tmp", NULL);
+
+  if (! con->has_container_env)
+    collect_options (con, "--setenv", "container", "bwrap-oci", NULL);
+}
+
+static void
 do_mounts (struct context *con, JsonNode *rootval)
 {
   GList *members;
@@ -624,6 +650,7 @@ do_mounts (struct context *con, JsonNode *rootval)
     }
 
   check_required_mounts (con, explicit_mounts);
+  check_systemd_required_mounts (con, explicit_mounts);
 
   g_hash_table_unref (explicit_mounts);
 }
@@ -704,6 +731,8 @@ do_process (struct context *con, JsonNode *rootval)
             error (EXIT_FAILURE, 0, "invalid env setting\n");
           *sep = '\0';
           collect_options (con, "--setenv", val, sep + 1, NULL);
+          if (g_strcmp0 (val, "container") == 0)
+            con->has_container_env = TRUE;
           g_free (val);
           g_variant_unref (env);
         }
