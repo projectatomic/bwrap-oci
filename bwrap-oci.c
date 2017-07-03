@@ -520,6 +520,23 @@ do_hostname (struct context *con, JsonNode *rootval)
     collect_options (con, "--hostname", json_node_get_string (rootval), NULL);
 }
 
+static gboolean
+find_child_value (GVariant *root, const char *value)
+{
+  if (root)
+    {
+      gsize i;
+      for (i = 0; i < g_variant_n_children (root); i++)
+        {
+          char *child_val = NULL;
+          GVariant *child = g_variant_get_child_value (g_variant_get_child_value (root, i), 0);
+          g_variant_get (child, "s", &child_val);
+          if (g_strcmp0 (child_val, value) == 0)
+            return TRUE;
+        }
+    }
+  return FALSE;
+}
 static void
 do_mounts (struct context *con, JsonNode *rootval)
 {
@@ -562,18 +579,7 @@ do_mounts (struct context *con, JsonNode *rootval)
             error (EXIT_FAILURE, 0, "invalid source for bind mount\n");
           sourceval = g_variant_get_string (source, NULL);
           options = g_variant_lookup_value (variant, "options", G_VARIANT_TYPE_ARRAY);
-          if (options)
-            {
-              gsize i;
-              for (i = 0; i < g_variant_n_children (options); i++)
-                {
-                  char *val = NULL;
-                  GVariant *child = g_variant_get_child_value (g_variant_get_child_value (options, i), 0);
-                  g_variant_get (child, "s", &val);
-                  if (g_strcmp0 (val, "ro") == 0)
-                    readonly = TRUE;
-                }
-            }
+          readonly = find_child_value (options, "ro");
           collect_options (con, readonly ? "--ro-bind" : "--bind", sourceval, destinationval, NULL);
         }
       else if (g_strcmp0 (typeval, "devtmpfs") == 0)
