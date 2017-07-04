@@ -35,6 +35,7 @@
 #include <libgen.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include "safe-read-write.h"
 #include "subugidmap.h"
 
@@ -550,6 +551,17 @@ check_required_mounts (struct context *con, GHashTable *mounts)
       collect_options (con, "--dev-bind", "/dev/tty", "/dev/tty", NULL);
 }
 
+static gboolean
+file_exist_p (const char *root, const char *file)
+{
+  int res;
+  struct stat st;
+  gchar *fpath = g_strdup_printf ("%s%s", root, file);
+  res = lstat (fpath, &st);
+  g_free (fpath);
+  return res == 0;
+}
+
 static void
 check_systemd_required_mounts (struct context *con, GHashTable *mounts)
 {
@@ -570,6 +582,9 @@ check_systemd_required_mounts (struct context *con, GHashTable *mounts)
 
   if (! g_hash_table_contains (mounts, "/var/tmp"))
       collect_options (con, "--tmpfs", "/var/tmp", NULL);
+
+  if (! g_hash_table_contains (mounts, "/etc/machine-id") && !file_exist_p (con->rootfs, "/etc/machine-id"))
+    collect_options (con, "--symlink", "/tmp/machine-id", "/etc/machine-id", NULL);
 
   if (! con->has_container_env)
     collect_options (con, "--setenv", "container", "bwrap-oci", NULL);
