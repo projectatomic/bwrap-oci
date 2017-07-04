@@ -67,6 +67,7 @@ static gboolean opt_version;
 static gboolean opt_enable_hooks;
 static const char *opt_configuration = "config.json";
 static char *opt_bwrap = BWRAP;
+static char *opt_pid_file;
 
 static GOptionEntry entries[] =
 {
@@ -75,6 +76,7 @@ static GOptionEntry entries[] =
   { "enable-hooks", 0, 0, G_OPTION_ARG_NONE, &opt_enable_hooks, "Execute the OCI hooks", NULL },
   { "version", 0, 0, G_OPTION_ARG_NONE, &opt_version, "Print version information and exit", NULL },
   { "bwrap", 0, 0, G_OPTION_ARG_STRING, &opt_bwrap, "Specify the path to the bubblewrap executable to use", "PATH" },
+  { "pid-file", 0, 0, G_OPTION_ARG_STRING, &opt_pid_file, "Specify the path to the file where write the PID of the sandboxed process", "PIDFILE" },
   { NULL }
 };
 
@@ -1066,6 +1068,7 @@ main (int argc, char *argv[])
     }
 
   need_info_fd |= initialize_user_mappings (context);
+  need_info_fd |= opt_pid_file != NULL;
 
   rootval = json_parser_get_root (parser);
   root = json_node_get_object (rootval);
@@ -1139,7 +1142,7 @@ main (int argc, char *argv[])
       return EXIT_SUCCESS;
     }
 
-  if (context->prestart_hooks == NULL && context->poststop_hooks == NULL && !context->has_user_mappings)
+  if (context->prestart_hooks == NULL && context->poststop_hooks == NULL && !context->has_user_mappings && !need_info_fd)
     {
       execv (opt_bwrap, bwrap_argv);
     }
@@ -1194,6 +1197,14 @@ main (int argc, char *argv[])
               g_object_unref (parser_info);
             }
 
+          if (opt_pid_file)
+            {
+              FILE *pidfile = fopen (opt_pid_file, "w");
+              if (pidfile == NULL)
+                error (EXIT_FAILURE, errno, "error openening pid file");
+              fprintf (pidfile, "%" G_GINT64_FORMAT "\n", child_pid);
+              fclose (pidfile);
+            }
           if (context->has_user_mappings)
             {
               close (context->userns_block_pipe[0]);
