@@ -1073,6 +1073,9 @@ main (int argc, char *argv[])
   if (bwrap_has_option ("as-pid-1"))
     collect_options (context, "--as-pid-1", NULL);
 
+  if (bwrap_has_option ("die-with-parent"))
+    collect_options (context, "--die-with-parent", NULL);
+
   if (json_object_has_member (root, "root"))
     do_root (context, json_object_get_member (root, "root"));
 
