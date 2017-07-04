@@ -1,7 +1,7 @@
 container:
     # REQUIRED
     # Specify an FQIN or Docker Hub image.
-    image: fedora:24
+    image: fedora:25
 
 # OPTIONAL
 # List of packages to install during provisioning. If
