@@ -16,7 +16,7 @@
  *
  */
 
-#include "config.h"
+#include <config.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <error.h>
@@ -45,7 +45,7 @@
 
   Copyright 2010 Lennart Poettering
 */
-#if defined(__i386__) || defined(__x86_64__)
+#if defined __i386__ || defined __x86_64__
 
 /* The precise definition of __O_TMPFILE is arch specific, so let's
  * just define this on x86 where we know the value. */
@@ -192,7 +192,7 @@ read_bwrap_help ()
   if (g_spawn_sync (NULL, (gchar **) argv, NULL, G_SPAWN_DEFAULT, NULL,
                     NULL, &output, NULL, &exit_status, NULL) == FALSE)
     {
-      error (EXIT_FAILURE, errno, "Error running bwrap --help");
+      error (EXIT_FAILURE, errno, "error running bwrap --help");
     }
 
   bwrap_options = g_hash_table_new (g_str_hash, g_str_equal);
@@ -1030,7 +1030,7 @@ write_mapping (const char *program, pid_t pid, uint32_t host_id, uint32_t sandbo
                     NULL, NULL, NULL, &exit_status, NULL) == FALSE ||
       exit_status != 0)
     {
-      error (EXIT_FAILURE, errno, "Error running %s", program);
+      error (EXIT_FAILURE, errno, "error running %s", program);
     }
 }
 

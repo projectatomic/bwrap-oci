@@ -16,10 +16,9 @@
  *
  */
 
+#include <config.h>
 #include "subugidmap.h"
 
-#include <assert.h>
-#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
@@ -36,9 +35,7 @@ static void
 cleanup_freep (void *p)
 {
   void **pp = (void **) p;
-
-  if (*pp)
-    free (*pp);
+  free (*pp);
 }
 
 static void

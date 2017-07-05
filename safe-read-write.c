@@ -16,6 +16,7 @@
  *
  */
 
+#include <config.h>
 #include "safe-read-write.h"
 #include <errno.h>
 
