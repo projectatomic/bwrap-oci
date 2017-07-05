@@ -36,6 +36,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include "safe-read-write.h"
 #include "subugidmap.h"
 
@@ -357,6 +358,37 @@ delete_container (const char *name)
   g_free (run_directory);
   g_free (dir);
   g_free (status);
+}
+
+static void
+list_containers ()
+{
+  gchar *run_directory = get_run_directory ();
+  DIR *dir = opendir (run_directory);
+  struct dirent *dp;
+  if (dir == NULL)
+    {
+      if (errno == ENOENT)
+        {
+          g_free (run_directory);
+          return;
+        }
+      error (EXIT_FAILURE, errno, "error opening %s", run_directory);
+    }
+  g_free (run_directory);
+
+  do
+    {
+      if ((dp = readdir(dir)) != NULL)
+        {
+          if (dp->d_name[0] == '.')
+            continue;
+          printf ("- %s\n", dp->d_name);
+        }
+    }
+  while (dp != NULL);
+
+  closedir (dir);
 }
 
 static void
@@ -1414,6 +1446,10 @@ main (int argc, char *argv[])
         error (EXIT_FAILURE, 0, "delete needs an argument");
 
       delete_container (argv[2]);
+    }
+  else if (g_strcmp0 (cmd, "list") == 0)
+    {
+      list_containers ();
     }
   else
     {
