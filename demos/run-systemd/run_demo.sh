@@ -20,6 +20,6 @@ bwrap --uid 0 --gid 0 --unshare-user --bind rootfs / --dev /dev --proc /proc --t
 
 bwrap --uid 0 --gid 0 --unshare-user --bind rootfs / --dev /dev --proc /proc --tmpfs /run --tmpfs /var --tmpfs /var/log systemctl mask dev-hugepages.mount
 
-bwrap-oci --pid-file=/tmp/pidfile
+systemd-run --user --scope bwrap-oci --pid-file=/tmp/pidfile
 
 kill -37 $(cat /tmp/pidfile)
