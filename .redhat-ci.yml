@@ -23,6 +23,7 @@ packages:
 build: true
 
 tests:
+    - make syntax-check
     - make check
 
 branches:
