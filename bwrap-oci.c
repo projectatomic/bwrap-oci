@@ -68,6 +68,7 @@ static gboolean opt_enable_hooks;
 static const char *opt_configuration = "config.json";
 static char *opt_bwrap = BWRAP;
 static char *opt_pid_file;
+static gboolean opt_test_environment;
 
 static GOptionEntry entries[] =
 {
@@ -115,7 +116,7 @@ struct context
 static void
 format_fd (gchar *buf, int fd)
 {
-  if (opt_dry_run)
+  if (opt_test_environment || opt_dry_run)
     g_sprintf (buf, "FD");
   else
     g_sprintf (buf, "%i", fd);
@@ -262,6 +263,10 @@ can_mask_or_ro_p (const char *path)
 {
   int res;
   struct stat st;
+
+  if (opt_test_environment)
+    return TRUE;
+
   if (!g_str_has_prefix (path, "/sys") && !g_str_has_prefix (path, "/proc"))
     return TRUE;
 
@@ -1263,6 +1268,7 @@ main (int argc, char *argv[])
   GOptionContext *opt_context;
   GError *gerror = NULL;
 
+  opt_test_environment = getenv ("TEST") ? TRUE : FALSE;
   opt_context = g_option_context_new ("- converter from OCI configuration to bubblewrap command line");
   g_option_context_add_main_entries (opt_context, entries, PACKAGE_STRING);
   if (!g_option_context_parse (opt_context, &argc, &argv, &gerror))

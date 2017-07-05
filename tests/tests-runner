@@ -1,6 +1,9 @@
 #!/bin/sh
 set -euo pipefail
 
+# Used internally by bwrap-oci to generate more deterministic output
+export TEST=1
+
 export TMP_DIR=$(mktemp -p $(pwd) -d -t .tmp.XXXXXXXXXX)
 
 teardown () {
