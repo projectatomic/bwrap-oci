@@ -12,6 +12,7 @@ packages:
     - automake
     - make
     - gcc
+    - git
     - pkgconfig(json-glib-1.0)
     - libseccomp-devel
     - libxslt
