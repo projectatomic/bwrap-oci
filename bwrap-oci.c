@@ -246,6 +246,29 @@ collect_args (struct context *context, ...)
   va_end (valist);
 }
 
+static gboolean
+file_exist_p (const char *root, const char *file)
+{
+  int res;
+  struct stat st;
+  gchar *fpath = g_strdup_printf ("%s%s", root, file);
+  res = lstat (fpath, &st);
+  g_free (fpath);
+  return res == 0;
+}
+
+static gboolean
+can_mask_or_ro_p (const char *path)
+{
+  int res;
+  struct stat st;
+  if (!g_str_has_prefix (path, "/sys") && !g_str_has_prefix (path, "/proc"))
+    return TRUE;
+
+  res = lstat (path, &st);
+  return res == 0 && !S_ISDIR (st.st_mode);
+}
+
 static void
 do_hooks (struct context *con, JsonNode *rootval)
 {
@@ -339,23 +362,6 @@ do_linux (struct context *con, JsonNode *rootval)
           g_variant_unref (variant);
         }
     }
-  if (json_object_has_member (root, "readonlyPaths"))
-    {
-      JsonNode *namespaces;
-      GList *members;
-      GList *iter;
-      namespaces = json_object_get_member (root, "readonlyPaths");
-      members = json_array_get_elements (json_node_get_array (namespaces));
-      for (iter = members; iter; iter = iter->next)
-        {
-          GVariant *variant = json_gvariant_deserialize (iter->data, "s", NULL);
-          const char *path = g_variant_get_string (variant, NULL);
-
-          add_readonly_path (con, "--ro-bind", path, path, NULL);
-
-          g_variant_unref (variant);
-        }
-    }
   if (json_object_has_member (root, "maskedPaths"))
     {
       JsonNode *namespaces;
@@ -368,7 +374,26 @@ do_linux (struct context *con, JsonNode *rootval)
           GVariant *variant = json_gvariant_deserialize (iter->data, "s", NULL);
           const char *path = g_variant_get_string (variant, NULL);
 
-          add_readonly_path (con, "--bind", "/dev/null", path, NULL);
+          if (can_mask_or_ro_p (path))
+            add_readonly_path (con, "--bind", "/dev/null", path, NULL);
+
+          g_variant_unref (variant);
+        }
+    }
+  if (json_object_has_member (root, "readonlyPaths"))
+    {
+      JsonNode *namespaces;
+      GList *members;
+      GList *iter;
+      namespaces = json_object_get_member (root, "readonlyPaths");
+      members = json_array_get_elements (json_node_get_array (namespaces));
+      for (iter = members; iter; iter = iter->next)
+        {
+          GVariant *variant = json_gvariant_deserialize (iter->data, "s", NULL);
+          const char *path = g_variant_get_string (variant, NULL);
+
+          if (can_mask_or_ro_p (path))
+            add_readonly_path (con, "--ro-bind", path, path, NULL);
 
           g_variant_unref (variant);
         }
@@ -551,17 +576,6 @@ check_required_mounts (struct context *con, GHashTable *mounts)
       collect_options (con, "--tmpfs", "/tmp", NULL);
     if (con->has_terminal)
       collect_options (con, "--dev-bind", "/dev/tty", "/dev/tty", NULL);
-}
-
-static gboolean
-file_exist_p (const char *root, const char *file)
-{
-  int res;
-  struct stat st;
-  gchar *fpath = g_strdup_printf ("%s%s", root, file);
-  res = lstat (fpath, &st);
-  g_free (fpath);
-  return res == 0;
 }
 
 static void
