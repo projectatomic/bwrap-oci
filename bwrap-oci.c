@@ -1041,8 +1041,8 @@ write_user_group_mappings (struct context *context, pid_t pid)
                  context->first_subgid, context->n_subgid);
 }
 
-int
-main (int argc, char *argv[])
+static int
+run_container (const char *container_id)
 {
   JsonNode *rootval;
   JsonObject *root;
@@ -1050,25 +1050,10 @@ main (int argc, char *argv[])
   struct context *context;
   char **bwrap_argv = NULL;
   JsonParser *parser;
-  GOptionContext *opt_context;
   int block_fd[2];
   int info_fd[2];
   int sync_fd[2];
   gboolean need_info_fd = FALSE;
-
-  opt_context = g_option_context_new ("- converter from OCI configuration to bubblewrap command line");
-  g_option_context_add_main_entries (opt_context, entries, PACKAGE_STRING);
-  if (!g_option_context_parse (opt_context, &argc, &argv, &gerror))
-    {
-      error (EXIT_FAILURE, 0, "option parsing failed: %s", gerror->message);
-    }
-  g_option_context_free (opt_context);
-
-  if (opt_version)
-    {
-      g_print ("%s\n", PACKAGE_STRING);
-      exit (EXIT_SUCCESS);
-    }
 
   context = g_new0 (struct context, 1);
   parser = json_parser_new ();
@@ -1170,7 +1155,6 @@ main (int argc, char *argv[])
           gchar *rootfs = context->rootfs;
           gchar *stdin;
           gchar *bundle_path;
-          gchar *id;
           gint64 child_pid = 0;
           const char *fmt_stdin = "{\"ociVersion\":\"1.0\", \"id\":\"%s\", \"pid\":%i, \"root\":\"%s\", \"bundlePath\":\"%s\"}";
 
@@ -1189,7 +1173,6 @@ main (int argc, char *argv[])
           if (fork () != 0)
             _exit (EXIT_SUCCESS);
 
-          id = basename (g_strdup (rootfs));
           bundle_path = dirname (g_strdup (rootfs));
 
           if (need_info_fd)
@@ -1228,7 +1211,7 @@ main (int argc, char *argv[])
 
           if (context->prestart_hooks)
             {
-              stdin = g_strdup_printf (fmt_stdin, id, child_pid, rootfs, bundle_path);
+              stdin = g_strdup_printf (fmt_stdin, container_id, child_pid, rootfs, bundle_path);
               run_hooks (context->prestart_hooks, stdin);
               g_free (stdin);
 
@@ -1243,7 +1226,7 @@ main (int argc, char *argv[])
                 error (0, errno, "error while waiting for bubblewrap to terminate");
               else
                 {
-                  stdin = g_strdup_printf (fmt_stdin, id, 0, rootfs, bundle_path);
+                  stdin = g_strdup_printf (fmt_stdin, container_id, 0, rootfs, bundle_path);
                   run_hooks (context->poststop_hooks, stdin);
                   g_free (stdin);
                 }
@@ -1271,4 +1254,50 @@ main (int argc, char *argv[])
   }
 
   return EXIT_FAILURE;
+}
+
+int
+main (int argc, char *argv[])
+{
+  const char *cmd = "run";
+  GOptionContext *opt_context;
+  GError *gerror = NULL;
+
+  opt_context = g_option_context_new ("- converter from OCI configuration to bubblewrap command line");
+  g_option_context_add_main_entries (opt_context, entries, PACKAGE_STRING);
+  if (!g_option_context_parse (opt_context, &argc, &argv, &gerror))
+    {
+      error (EXIT_FAILURE, 0, "option parsing failed: %s", gerror->message);
+    }
+  g_option_context_free (opt_context);
+
+  if (opt_version)
+    {
+      g_print ("%s\n", PACKAGE_STRING);
+      exit (EXIT_SUCCESS);
+    }
+
+  if (argc > 1)
+    cmd = argv[1];
+
+  if (g_strcmp0 (cmd, "run") == 0)
+    {
+      const char *id;
+      if (argc > 2)
+        id = argv[2];
+      else
+        {
+          char *cwd = get_current_dir_name ();
+          if (cwd == NULL)
+            error (EXIT_FAILURE, errno, "error cwd");
+          id = g_strdup (basename (cwd));
+          free (cwd);
+        }
+      return run_container (id);
+    }
+  else
+    {
+      error (EXIT_FAILURE, 0, "unknown command %s", cmd);
+      _exit (1);
+    }
 }
