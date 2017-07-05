@@ -1068,7 +1068,6 @@ run_container (const char *container_id)
   int block_fd[2];
   int info_fd[2];
   int sync_fd[2];
-  gboolean need_info_fd = FALSE;
   pid_t pid;
 
   context = g_new0 (struct context, 1);
@@ -1082,9 +1081,7 @@ run_container (const char *container_id)
       return EXIT_FAILURE;
     }
 
-  need_info_fd |= initialize_user_mappings (context);
-  need_info_fd |= opt_pid_file != NULL;
-  need_info_fd |= opt_detach != NULL;
+  initialize_user_mappings (context);
 
   rootval = json_parser_get_root (parser);
   root = json_node_get_object (rootval);
@@ -1127,8 +1124,6 @@ run_container (const char *container_id)
       format_fd (pipe_fmt, block_fd[0]);
       collect_options (context, "--block-fd", pipe_fmt, NULL);
 
-      need_info_fd = TRUE;
-
       if (context->poststop_hooks)
         {
           if (pipe (sync_fd) != 0)
@@ -1138,15 +1133,14 @@ run_container (const char *container_id)
         }
   }
 
-  if (need_info_fd)
-    {
-      char pipe_fmt[16];
+  {
+    char pipe_fmt[16];
 
-      if (pipe (info_fd) != 0)
-        error (EXIT_FAILURE, errno, "pipe");
+    if (pipe (info_fd) != 0)
+      error (EXIT_FAILURE, errno, "pipe");
 
-      format_fd (pipe_fmt, info_fd[1]);
-      collect_options (context, "--info-fd", pipe_fmt, NULL);
+    format_fd (pipe_fmt, info_fd[1]);
+    collect_options (context, "--info-fd", pipe_fmt, NULL);
   }
 
   finalize (context);
@@ -1169,10 +1163,7 @@ run_container (const char *container_id)
       gint64 child_pid = 0;
       const char *fmt_stdin = "{\"ociVersion\":\"1.0\", \"id\":\"%s\", \"pid\":%i, \"root\":\"%s\", \"bundlePath\":\"%s\"}";
 
-      if (need_info_fd)
-        {
-          close (info_fd[1]);
-        }
+      close (info_fd[1]);
       if (context->prestart_hooks)
         {
           close (block_fd[0]);
@@ -1184,24 +1175,25 @@ run_container (const char *container_id)
 
       bundle_path = dirname (g_strdup (rootfs));
 
-      if (need_info_fd)
-        {
-          JsonNode *rootval_info;
-          JsonObject *root_info;
-          JsonParser *parser_info;
-          GInputStream *stream;
-          parser_info = json_parser_new ();
-          stream = g_unix_input_stream_new (info_fd[0], TRUE);
-          json_parser_load_from_stream (parser_info, stream, NULL, &gerror);
+      /* Handle info-fd output.  */
+      {
+        JsonNode *rootval_info;
+        JsonObject *root_info;
+        JsonParser *parser_info;
+        GInputStream *stream;
+        parser_info = json_parser_new ();
+        stream = g_unix_input_stream_new (info_fd[0], TRUE);
+        json_parser_load_from_stream (parser_info, stream, NULL, &gerror);
 
-          rootval_info = json_parser_get_root (parser_info);
-          root_info = json_node_get_object (rootval_info);
+        rootval_info = json_parser_get_root (parser_info);
+        root_info = json_node_get_object (rootval_info);
 
-          child_pid = json_node_get_int (json_object_get_member (root_info, "child-pid"));
+        child_pid = json_node_get_int (json_object_get_member (root_info, "child-pid"));
 
-          g_object_unref (stream);
-          g_object_unref (parser_info);
-        }
+        g_object_unref (stream);
+        g_object_unref (parser_info);
+      }
+
 
       if (opt_pid_file)
         {
