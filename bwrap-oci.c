@@ -1408,8 +1408,12 @@ main (int argc, char *argv[])
         }
       return run_container (id);
     }
-  if (g_strcmp0 (cmd, "delete") == 0)
+  else if (g_strcmp0 (cmd, "delete") == 0)
     {
+      if (argc < 3)
+        error (EXIT_FAILURE, 0, "delete needs an argument");
+
+      delete_container (argv[2]);
     }
   else
     {
