@@ -68,13 +68,15 @@ static gboolean opt_enable_hooks;
 static const char *opt_configuration = "config.json";
 static char *opt_bwrap = BWRAP;
 static char *opt_pid_file;
+static char *opt_detach;
 static gboolean opt_test_environment;
 
 static GOptionEntry entries[] =
 {
   { "configuration", 'c', 0, G_OPTION_ARG_STRING, &opt_configuration, "Configuration file", "FILE" },
-  { "dry-run", 'd', 0, G_OPTION_ARG_NONE, &opt_dry_run, "Print the command line for bubblewrap", NULL },
+  { "dry-run", 0, 0, G_OPTION_ARG_NONE, &opt_dry_run, "Print the command line for bubblewrap", NULL },
   { "enable-hooks", 0, 0, G_OPTION_ARG_NONE, &opt_enable_hooks, "Execute the OCI hooks", NULL },
+  { "detach", 'd', 0, G_OPTION_ARG_NONE, &opt_detach, "Do not wait for termination", NULL },
   { "version", 0, 0, G_OPTION_ARG_NONE, &opt_version, "Print version information and exit", NULL },
   { "bwrap", 0, 0, G_OPTION_ARG_STRING, &opt_bwrap, "Specify the path to the bubblewrap executable to use", "PATH" },
   { "pid-file", 0, 0, G_OPTION_ARG_STRING, &opt_pid_file, "Specify the path to the file where write the PID of the sandboxed process", "PIDFILE" },
@@ -1046,6 +1048,14 @@ write_user_group_mappings (struct context *context, pid_t pid)
                  context->first_subgid, context->n_subgid);
 }
 
+static void
+detach_process ()
+{
+  setsid ();
+  if (fork () != 0)
+    _exit (EXIT_SUCCESS);
+}
+
 static int
 run_container (const char *container_id)
 {
@@ -1073,6 +1083,7 @@ run_container (const char *container_id)
 
   need_info_fd |= initialize_user_mappings (context);
   need_info_fd |= opt_pid_file != NULL;
+  need_info_fd |= opt_detach != NULL;
 
   rootval = json_parser_get_root (parser);
   root = json_node_get_object (rootval);
@@ -1174,9 +1185,7 @@ run_container (const char *container_id)
           if (context->poststop_hooks)
             close (sync_fd[1]);
 
-          setsid ();
-          if (fork () != 0)
-            _exit (EXIT_SUCCESS);
+          detach_process ();
 
           bundle_path = dirname (g_strdup (rootfs));
 
@@ -1253,6 +1262,8 @@ run_container (const char *container_id)
             close (context->userns_block_pipe[1]);
 
           while (waitpid (pid, &status, 0) < 0 && errno == EINTR);
+          if (opt_detach)
+            detach_process ();
           execv (opt_bwrap, bwrap_argv);
         }
     return -1;
