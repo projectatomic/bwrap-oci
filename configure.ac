@@ -10,6 +10,7 @@ AM_INIT_AUTOMAKE([1.11 -Wno-portability foreign tar-ustar no-dist-gzip dist-xz s
 AM_MAINTAINER_MODE([enable])
 AM_SILENT_RULES([yes])
 
+AC_PROG_SED
 AC_PROG_CC
 AM_PROG_CC_C_O
 
