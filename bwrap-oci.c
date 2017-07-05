@@ -276,6 +276,15 @@ can_mask_or_ro_p (const char *path)
   return res == 0 && !S_ISDIR (st.st_mode);
 }
 
+static gchar *
+get_bundle_path (const char *rootfs)
+{
+  gchar *ret, *tmp = g_strdup (rootfs);
+  ret = canonicalize_file_name(dirname (tmp));
+  g_free (tmp);
+  return ret;
+}
+
 static void
 do_hooks (struct context *con, JsonNode *rootval)
 {
@@ -1173,7 +1182,7 @@ run_container (const char *container_id)
 
       detach_process ();
 
-      bundle_path = dirname (g_strdup (rootfs));
+      bundle_path = get_bundle_path (rootfs);
 
       /* Handle info-fd output.  */
       {
