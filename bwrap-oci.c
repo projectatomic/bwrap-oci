@@ -1069,6 +1069,7 @@ run_container (const char *container_id)
   int info_fd[2];
   int sync_fd[2];
   gboolean need_info_fd = FALSE;
+  pid_t pid;
 
   context = g_new0 (struct context, 1);
   parser = json_parser_new ();
@@ -1157,119 +1158,111 @@ run_container (const char *container_id)
       return EXIT_SUCCESS;
     }
 
-  if (context->prestart_hooks == NULL && context->poststop_hooks == NULL && !context->has_user_mappings && !need_info_fd)
+  pid = fork ();
+  if (pid < 0)
+    error (EXIT_FAILURE, errno, "error forking");
+  if (pid == 0)
     {
-      execv (opt_bwrap, bwrap_argv);
+      gchar *rootfs = context->rootfs;
+      gchar *stdin;
+      gchar *bundle_path;
+      gint64 child_pid = 0;
+      const char *fmt_stdin = "{\"ociVersion\":\"1.0\", \"id\":\"%s\", \"pid\":%i, \"root\":\"%s\", \"bundlePath\":\"%s\"}";
+
+      if (need_info_fd)
+        {
+          close (info_fd[1]);
+        }
+      if (context->prestart_hooks)
+        {
+          close (block_fd[0]);
+        }
+      if (context->poststop_hooks)
+        close (sync_fd[1]);
+
+      detach_process ();
+
+      bundle_path = dirname (g_strdup (rootfs));
+
+      if (need_info_fd)
+        {
+          JsonNode *rootval_info;
+          JsonObject *root_info;
+          JsonParser *parser_info;
+          GInputStream *stream;
+          parser_info = json_parser_new ();
+          stream = g_unix_input_stream_new (info_fd[0], TRUE);
+          json_parser_load_from_stream (parser_info, stream, NULL, &gerror);
+
+          rootval_info = json_parser_get_root (parser_info);
+          root_info = json_node_get_object (rootval_info);
+
+          child_pid = json_node_get_int (json_object_get_member (root_info, "child-pid"));
+
+          g_object_unref (stream);
+          g_object_unref (parser_info);
+        }
+
+      if (opt_pid_file)
+        {
+          FILE *pidfile = fopen (opt_pid_file, "w");
+          if (pidfile == NULL)
+            error (EXIT_FAILURE, errno, "error openening pid file");
+          fprintf (pidfile, "%" G_GINT64_FORMAT "\n", child_pid);
+          fclose (pidfile);
+        }
+      if (context->has_user_mappings)
+        {
+          close (context->userns_block_pipe[0]);
+          write_user_group_mappings (context, child_pid);
+          safe_write (context->userns_block_pipe[1], "1", 1);
+        }
+
+      if (context->prestart_hooks)
+        {
+          stdin = g_strdup_printf (fmt_stdin, container_id, child_pid, rootfs, bundle_path);
+          run_hooks (context->prestart_hooks, stdin);
+          g_free (stdin);
+
+          if (safe_write (block_fd[1], "1", 1) < 0)
+            error (0, errno, "error while unblocking the bubblewrap process");
+        }
+
+      if (context->poststop_hooks)
+        {
+          char b;
+          if (safe_read (sync_fd[0], &b, 1) < 0)
+            error (0, errno, "error while waiting for bubblewrap to terminate");
+          else
+            {
+              stdin = g_strdup_printf (fmt_stdin, container_id, 0, rootfs, bundle_path);
+              run_hooks (context->poststop_hooks, stdin);
+              g_free (stdin);
+            }
+        }
+
+      _exit (EXIT_SUCCESS);
     }
   else
     {
-      pid_t pid = fork ();
-      if (pid < 0)
-        error (EXIT_FAILURE, errno, "error forking");
-      if (pid == 0)
+      int status;
+      if (context->prestart_hooks)
         {
-          gchar *rootfs = context->rootfs;
-          gchar *stdin;
-          gchar *bundle_path;
-          gint64 child_pid = 0;
-          const char *fmt_stdin = "{\"ociVersion\":\"1.0\", \"id\":\"%s\", \"pid\":%i, \"root\":\"%s\", \"bundlePath\":\"%s\"}";
-
-          if (need_info_fd)
-            {
-              close (info_fd[1]);
-            }
-          if (context->prestart_hooks)
-            {
-              close (block_fd[0]);
-            }
-          if (context->poststop_hooks)
-            close (sync_fd[1]);
-
-          detach_process ();
-
-          bundle_path = dirname (g_strdup (rootfs));
-
-          if (need_info_fd)
-            {
-              JsonNode *rootval_info;
-              JsonObject *root_info;
-              JsonParser *parser_info;
-              GInputStream *stream;
-              parser_info = json_parser_new ();
-              stream = g_unix_input_stream_new (info_fd[0], TRUE);
-              json_parser_load_from_stream (parser_info, stream, NULL, &gerror);
-
-              rootval_info = json_parser_get_root (parser_info);
-              root_info = json_node_get_object (rootval_info);
-
-              child_pid = json_node_get_int (json_object_get_member (root_info, "child-pid"));
-
-              g_object_unref (stream);
-              g_object_unref (parser_info);
-            }
-
-          if (opt_pid_file)
-            {
-              FILE *pidfile = fopen (opt_pid_file, "w");
-              if (pidfile == NULL)
-                error (EXIT_FAILURE, errno, "error openening pid file");
-              fprintf (pidfile, "%" G_GINT64_FORMAT "\n", child_pid);
-              fclose (pidfile);
-            }
-          if (context->has_user_mappings)
-            {
-              close (context->userns_block_pipe[0]);
-              write_user_group_mappings (context, child_pid);
-              safe_write (context->userns_block_pipe[1], "1", 1);
-            }
-
-          if (context->prestart_hooks)
-            {
-              stdin = g_strdup_printf (fmt_stdin, container_id, child_pid, rootfs, bundle_path);
-              run_hooks (context->prestart_hooks, stdin);
-              g_free (stdin);
-
-              if (safe_write (block_fd[1], "1", 1) < 0)
-                error (0, errno, "error while unblocking the bubblewrap process");
-            }
-
-          if (context->poststop_hooks)
-            {
-              char b;
-              if (safe_read (sync_fd[0], &b, 1) < 0)
-                error (0, errno, "error while waiting for bubblewrap to terminate");
-              else
-                {
-                  stdin = g_strdup_printf (fmt_stdin, container_id, 0, rootfs, bundle_path);
-                  run_hooks (context->poststop_hooks, stdin);
-                  g_free (stdin);
-                }
-            }
-
-          _exit (EXIT_SUCCESS);
+          close (info_fd[0]);
+          close (block_fd[1]);
         }
-      else
-        {
-          int status;
-          if (context->prestart_hooks)
-            {
-              close (info_fd[0]);
-              close (block_fd[1]);
-            }
-          if (context->poststop_hooks)
-            close (sync_fd[0]);
-          if (context->has_user_mappings)
-            close (context->userns_block_pipe[1]);
+      if (context->poststop_hooks)
+        close (sync_fd[0]);
+      if (context->has_user_mappings)
+        close (context->userns_block_pipe[1]);
 
-          while (waitpid (pid, &status, 0) < 0 && errno == EINTR);
-          if (opt_detach)
-            detach_process ();
-          execv (opt_bwrap, bwrap_argv);
-        }
-    return -1;
-  }
+      while (waitpid (pid, &status, 0) < 0 && errno == EINTR);
+      if (opt_detach)
+        detach_process ();
+      execv (opt_bwrap, bwrap_argv);
+    }
 
-  return EXIT_FAILURE;
+  _exit (EXIT_FAILURE);
 }
 
 int
@@ -1311,6 +1304,9 @@ main (int argc, char *argv[])
           free (cwd);
         }
       return run_container (id);
+    }
+  if (g_strcmp0 (cmd, "delete") == 0)
+    {
     }
   else
     {
