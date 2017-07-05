@@ -285,6 +285,80 @@ get_bundle_path (const char *rootfs)
   return ret;
 }
 
+static gchar *
+get_run_directory ()
+{
+  gchar run_directory_buffer[64], *ret;
+  const char *root = getenv ("XDG_RUNTIME_DIR");
+  struct stat st;
+  int r;
+
+  if (root == NULL)
+    {
+      g_sprintf (run_directory_buffer, "/run/user/%d", getuid ());
+      root = run_directory_buffer;
+    }
+
+
+  ret = g_strdup_printf ("%s/%s", root, "bwrap-oci");
+  r = lstat (ret, &st);
+  if (r != 0)
+    {
+      if (errno == ENOENT)
+        mkdir (ret, 0700);
+      else
+        error (EXIT_FAILURE, errno, "error lstat %s", ret);
+    }
+  return ret;
+}
+
+static char *
+create_container (const char *name)
+{
+  struct stat st;
+  int r;
+  gchar *dir;
+  gchar *run_directory = get_run_directory ();
+  dir = g_strdup_printf ("%s/%s", run_directory, name);
+  g_free (run_directory);
+
+  r = lstat (dir, &st);
+  if (r == 0)
+    error (EXIT_FAILURE, 0, "container %s already exists", name);
+  if (r != 0 && errno != ENOENT)
+    error (EXIT_FAILURE, errno, "error lstat %s", dir);
+
+
+  if (mkdir (dir, 0700) < 0)
+    error (EXIT_FAILURE, errno, "error mkdir");
+
+  return dir;
+}
+
+static void
+delete_container (const char *name)
+{
+  gchar *dir, *status;
+  gchar *run_directory = get_run_directory ();
+  struct stat st;
+
+  dir = g_strdup_printf ("%s/%s", run_directory, name);
+  status = g_strdup_printf ("%s/%s/status.json", run_directory, name);
+
+  if (lstat (dir, &st) < 0 && errno == ENOENT)
+    error (EXIT_FAILURE, 0, "container %s does not exist", name);
+
+  if (unlink (status) < 0)
+    error (EXIT_FAILURE, errno, "unlink status file for container %s", name);
+
+  if (rmdir (dir) < 0)
+    error (EXIT_FAILURE, errno, "rmdir for container %s", name);
+
+  g_free (run_directory);
+  g_free (dir);
+  g_free (status);
+}
+
 static void
 do_hooks (struct context *con, JsonNode *rootval)
 {
@@ -1065,6 +1139,23 @@ detach_process ()
     _exit (EXIT_SUCCESS);
 }
 
+static void
+write_container_state (const char *container_state, pid_t child_pid, const char *bundle_path)
+{
+  gchar *path = g_strdup_printf ("%s/status.json", container_state);
+  FILE *f = fopen (path, "w");
+  if (f != NULL)
+    {
+      const char *fmt_stdin = "{\"pid\":%i, \"bundlePath\":\"%s\"}";
+      char *stdin = g_strdup_printf (fmt_stdin, child_pid, bundle_path);
+      fprintf (f, "%s", stdin);
+      g_free (stdin);
+      fclose (f);
+    }
+  g_free (path);
+}
+
+
 static int
 run_container (const char *container_id)
 {
@@ -1078,6 +1169,7 @@ run_container (const char *container_id)
   int info_fd[2];
   int sync_fd[2];
   pid_t pid;
+  char *container_state;
 
   context = g_new0 (struct context, 1);
   parser = json_parser_new ();
@@ -1124,7 +1216,7 @@ run_container (const char *container_id)
 
   g_object_unref (parser);
 
-  if (context->prestart_hooks || context->poststop_hooks)
+  if (context->prestart_hooks || context->poststop_hooks || !opt_detach)
     {
       char pipe_fmt[16];
       if (pipe (block_fd) != 0)
@@ -1133,14 +1225,14 @@ run_container (const char *container_id)
       format_fd (pipe_fmt, block_fd[0]);
       collect_options (context, "--block-fd", pipe_fmt, NULL);
 
-      if (context->poststop_hooks)
+      if (context->poststop_hooks || !opt_detach)
         {
           if (pipe (sync_fd) != 0)
             error (EXIT_FAILURE, errno, "pipe");
           format_fd (pipe_fmt, sync_fd[1]);
           collect_options (context, "--sync-fd", pipe_fmt, NULL);
         }
-  }
+    }
 
   {
     char pipe_fmt[16];
@@ -1161,6 +1253,8 @@ run_container (const char *container_id)
       return EXIT_SUCCESS;
     }
 
+  container_state = create_container (container_id);
+
   pid = fork ();
   if (pid < 0)
     error (EXIT_FAILURE, errno, "error forking");
@@ -1177,7 +1271,7 @@ run_container (const char *container_id)
         {
           close (block_fd[0]);
         }
-      if (context->poststop_hooks)
+      if (context->poststop_hooks || !opt_detach)
         close (sync_fd[1]);
 
       detach_process ();
@@ -1203,6 +1297,8 @@ run_container (const char *container_id)
         g_object_unref (parser_info);
       }
 
+      write_container_state (container_state, child_pid, bundle_path);
+      g_free (container_state);
 
       if (opt_pid_file)
         {
@@ -1219,7 +1315,7 @@ run_container (const char *container_id)
           safe_write (context->userns_block_pipe[1], "1", 1);
         }
 
-      if (context->prestart_hooks)
+      if (context->poststop_hooks || !opt_detach)
         {
           stdin = g_strdup_printf (fmt_stdin, container_id, child_pid, rootfs, bundle_path);
           run_hooks (context->prestart_hooks, stdin);
@@ -1227,19 +1323,23 @@ run_container (const char *container_id)
 
           if (safe_write (block_fd[1], "1", 1) < 0)
             error (0, errno, "error while unblocking the bubblewrap process");
-        }
 
-      if (context->poststop_hooks)
-        {
-          char b;
-          if (safe_read (sync_fd[0], &b, 1) < 0)
-            error (0, errno, "error while waiting for bubblewrap to terminate");
-          else
+          /* Wait for the process to terminate.  */
+          {
+            char b;
+            if (safe_read (sync_fd[0], &b, 1) < 0)
+              error (0, errno, "error while waiting for bubblewrap to terminate");
+          }
+
+          if (context->poststop_hooks)
             {
               stdin = g_strdup_printf (fmt_stdin, container_id, 0, rootfs, bundle_path);
               run_hooks (context->poststop_hooks, stdin);
               g_free (stdin);
             }
+
+          if (!opt_detach)
+            delete_container (container_id);
         }
 
       _exit (EXIT_SUCCESS);
@@ -1252,12 +1352,14 @@ run_container (const char *container_id)
           close (info_fd[0]);
           close (block_fd[1]);
         }
-      if (context->poststop_hooks)
+      if (context->poststop_hooks || !opt_detach)
         close (sync_fd[0]);
       if (context->has_user_mappings)
         close (context->userns_block_pipe[1]);
 
+      /* Wait for the first detach.  */
       while (waitpid (pid, &status, 0) < 0 && errno == EINTR);
+
       if (opt_detach)
         detach_process ();
       execv (opt_bwrap, bwrap_argv);
