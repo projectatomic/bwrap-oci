@@ -33,6 +33,7 @@ bin_PROGRAMS = bwrap-oci
 
 bwrap_oci_SOURCES = \
 	bwrap-oci.c \
+	list.c \
 	safe-read-write.c \
 	util.c \
 	subugidmap.c \
@@ -50,7 +51,7 @@ TESTS = tests/bind.conf tests/cwd.conf tests/env.conf tests/hostname.conf \
 TEST_EXTENSIONS = .conf
 CONF_LOG_COMPILER = $(top_srcdir)/tests/tests-runner
 
-EXTRA_DIST = autogen.sh bwrap-oci.xml safe-read-write.h
+EXTRA_DIST = autogen.sh bwrap-oci.xml safe-read-write.h util.h list.h
 
 EXTRA_DIST += $(TESTS:.conf=.conf.expected)
 EXTRA_DIST += $(TESTS:.conf=.conf.command)

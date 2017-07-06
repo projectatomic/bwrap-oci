@@ -36,10 +36,10 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
-#include <dirent.h>
 #include "safe-read-write.h"
 #include "subugidmap.h"
 #include "util.h"
+#include "list.h"
 
 
 /***
@@ -332,92 +332,6 @@ delete_container (const char *name)
   g_free (run_directory);
   g_free (dir);
   g_free (status);
-}
-
-static void
-read_container_status_file (const char *path, pid_t *pid, char **bundlePath)
-{
-  GError *gerror = NULL;
-  JsonParser *parser;
-  JsonObject *root;
-  JsonNode *tmp;
-
-  parser = json_parser_new ();
-  json_parser_load_from_file (parser, path, &gerror);
-  if (gerror)
-    error (EXIT_FAILURE, 0, "Unable to parse `%s': %s\n", path, gerror->message);
-
-  root = json_node_get_object (json_parser_get_root (parser));
-
-  tmp = json_object_get_member (root, "pid");
-  if (tmp)
-    *pid = json_node_get_int (tmp);
-  else
-    *pid = 0;
-
-  tmp = json_object_get_member (root, "bundlePath");
-  if (tmp)
-    *bundlePath = g_strdup (json_node_get_string (tmp));
-  else
-    *bundlePath = NULL;
-
-  if (gerror)
-    g_error_free (gerror);
-  g_object_unref (parser);
-}
-
-static gboolean
-pid_running_p (pid_t pid)
-{
-  if (pid == 0)
-    return FALSE;
-
-  return kill (pid, 0) == 0;
-}
-
-static void
-list_containers ()
-{
-  gchar *run_directory = get_run_directory ();
-  DIR *dir = opendir (run_directory);
-  struct dirent *dp;
-  if (dir == NULL)
-    {
-      if (errno == ENOENT)
-        {
-          g_free (run_directory);
-          return;
-        }
-      error (EXIT_FAILURE, errno, "error opening %s", run_directory);
-    }
-
-  printf ("NAME\tPID\tSTATUS\tBUNDLE\n");
-  do
-    {
-      gchar *path, *bundlePath;
-      const char *process_status;
-      pid_t pid;
-
-      if ((dp = readdir(dir)) != NULL)
-        {
-          if (dp->d_name[0] == '.')
-            continue;
-
-          path = g_strdup_printf ("%s/%s/status.json", run_directory, dp->d_name);
-          read_container_status_file (path, &pid, &bundlePath);
-
-          process_status = pid_running_p (pid) ? "running" : "stopped";
-
-          printf ("%s\t%d\t%s\t%s\n", dp->d_name, pid, process_status, bundlePath ? : "(none)");
-
-          g_free (path);
-          g_free (bundlePath);
-        }
-  }
-  while (dp != NULL);
-
-  closedir (dir);
-  g_free (run_directory);
 }
 
 static void
