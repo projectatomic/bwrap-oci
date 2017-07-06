@@ -779,7 +779,12 @@ initialize_user_mappings (struct context *context)
 }
 
 static int
-run_container (const char *container_id, gboolean detach)
+run_container (const char *container_id,
+               const char *configuration_file,
+               gboolean detach,
+               const char *pid_file,
+               gboolean enable_hooks,
+               gboolean dry_run)
 {
   JsonNode *rootval;
   JsonObject *root;
@@ -795,10 +800,10 @@ run_container (const char *container_id, gboolean detach)
 
   context = g_new0 (struct context, 1);
   parser = json_parser_new ();
-  json_parser_load_from_file (parser, opt_configuration, &gerror);
+  json_parser_load_from_file (parser, configuration_file, &gerror);
   if (gerror)
     {
-      g_print ("Unable to parse `%s': %s\n", opt_configuration, gerror->message);
+      g_print ("Unable to parse `%s': %s\n", configuration_file, gerror->message);
       g_error_free (gerror);
       g_object_unref (parser);
       return EXIT_FAILURE;
@@ -823,7 +828,7 @@ run_container (const char *container_id, gboolean detach)
   if (json_object_has_member (root, "linux"))
     do_linux (context, json_object_get_member (root, "linux"));
 
-  if (opt_enable_hooks && json_object_has_member (root, "hooks"))
+  if (enable_hooks && json_object_has_member (root, "hooks"))
     {
       if (bwrap_has_option ("block-fd") && bwrap_has_option ("info-fd"))
         do_hooks (context, json_object_get_member (root, "hooks"));
@@ -871,7 +876,7 @@ run_container (const char *container_id, gboolean detach)
   finalize (context);
   bwrap_argv = generate_bwrap_argv (context);
 
-  if (opt_dry_run)
+  if (dry_run)
     {
       dump_argv (bwrap_argv);
       return EXIT_SUCCESS;
@@ -924,9 +929,9 @@ run_container (const char *container_id, gboolean detach)
       write_container_state (container_state, child_pid, bundle_path);
       g_free (container_state);
 
-      if (opt_pid_file)
+      if (pid_file)
         {
-          FILE *pidfile = fopen (opt_pid_file, "w");
+          FILE *pidfile = fopen (pid_file, "w");
           if (pidfile == NULL)
             error (EXIT_FAILURE, errno, "error openening pid file");
           fprintf (pidfile, "%" G_GINT64_FORMAT "\n", child_pid);
@@ -986,7 +991,7 @@ run_container (const char *container_id, gboolean detach)
 
       if (context->detach)
         detach_process ();
-      execv (opt_bwrap, bwrap_argv);
+      execv (get_bwrap_path (), bwrap_argv);
     }
 
   _exit (EXIT_FAILURE);
@@ -1032,7 +1037,11 @@ main (int argc, char *argv[])
           id = g_strdup (basename (cwd));
           free (cwd);
         }
-      return run_container (id, opt_detach);
+      return run_container (id, opt_configuration,
+                            opt_detach,
+                            opt_pid_file,
+                            opt_enable_hooks,
+                            opt_dry_run);
     }
   else if (g_strcmp0 (cmd, "delete") == 0)
     {
