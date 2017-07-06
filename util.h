@@ -18,8 +18,15 @@
 #ifndef _UTIL_H
 # define _UTIL_H
 # include <config.h>
-# include "bwrap-oci.h"
 # include <glib.h>
+# include <unistd.h>
+# include <seccomp.h>
+
+struct user_mapping
+{
+  uint32_t first_subuid, n_subuid;
+  uint32_t first_subgid, n_subgid;
+};
 
 gchar *get_run_directory (void);
 guint64 get_seccomp_action (const char *name);
@@ -27,7 +34,7 @@ uint32_t get_seccomp_operator (const char *name);
 gboolean bwrap_has_option (const gchar *option);
 void write_container_state (const char *container_state, pid_t child_pid, const char *bundle_path);
 void detach_process ();
-void write_user_group_mappings (struct context *context, pid_t pid);
+void write_user_group_mappings (struct user_mapping *user_mapping, uid_t uid, gid_t gid, pid_t pid);
 gboolean file_exist_p (const char *root, const char *file);
 gboolean can_mask_or_ro_p (const char *path);
 gchar *get_bundle_path (const char *rootfs);
@@ -35,7 +42,7 @@ char *create_container (const char *name);
 void delete_container (const char *name);
 void format_fd (gchar *buf, int fd);
 void set_test_environment (gboolean status);
-int generate_seccomp_rules_file (struct context *context);
+int generate_seccomp_rules_file (scmp_filter_ctx seccomp);
 void set_bwrap_path (const char *bwrap);
 const char *get_bwrap_path ();
 

@@ -652,7 +652,7 @@ dump_argv (char **argv)
 static void
 finalize (struct context *context)
 {
-  int fd = generate_seccomp_rules_file (context);
+  int fd = generate_seccomp_rules_file (context->seccomp);
   if (fd >= 0)
     {
       char fdstr[10];
@@ -741,8 +741,8 @@ initialize_user_mappings (struct context *context)
       return context->has_user_mappings;
     }
 
-  has_subuid_map = getsubidrange (getuid (), TRUE, &context->first_subuid, &context->n_subuid) == 0 ? TRUE : FALSE;
-  has_subgid_map = getsubidrange (getgid (), FALSE, &context->first_subgid, &context->n_subgid) == 0 ? TRUE : FALSE;
+  has_subuid_map = getsubidrange (getuid (), TRUE, &context->user_mapping.first_subuid, &context->user_mapping.n_subuid) == 0 ? TRUE : FALSE;
+  has_subgid_map = getsubidrange (getgid (), FALSE, &context->user_mapping.first_subgid, &context->user_mapping.n_subgid) == 0 ? TRUE : FALSE;
 
   if (has_subuid_map != has_subgid_map)
     error (EXIT_FAILURE, 0, "invalid configuration for subuids and subgids");
@@ -920,7 +920,7 @@ run_container (const char *container_id,
       if (context->has_user_mappings)
         {
           close (context->userns_block_pipe[0]);
-          write_user_group_mappings (context, child_pid);
+          write_user_group_mappings (&context->user_mapping, context->uid, context->gid, child_pid);
           safe_write (context->userns_block_pipe[1], "1", 1);
         }
 

@@ -276,15 +276,15 @@ write_mapping (const char *program, pid_t pid, uint32_t host_id, uint32_t sandbo
 }
 
 void
-write_user_group_mappings (struct context *context, pid_t pid)
+write_user_group_mappings (struct user_mapping *user_mapping, uid_t uid, gid_t gid, pid_t pid)
 {
-  uid_t uid = getuid ();
-  gid_t gid = getgid ();
+  uid_t current_uid = getuid ();
+  gid_t current_gid = getgid ();
 
-  write_mapping ("/usr/bin/newuidmap", pid, uid, context->uid,
-                 context->first_subuid, context->n_subuid);
-  write_mapping ("/usr/bin/newgidmap", pid, gid, context->gid,
-                 context->first_subgid, context->n_subgid);
+  write_mapping ("/usr/bin/newuidmap", pid, current_uid, uid,
+                 user_mapping->first_subuid, user_mapping->n_subuid);
+  write_mapping ("/usr/bin/newgidmap", pid, current_gid, gid,
+                 user_mapping->first_subgid, user_mapping->n_subgid);
 }
 
 static int test_environment = -1;
@@ -396,10 +396,10 @@ delete_container (const char *name)
 }
 
 int
-generate_seccomp_rules_file (struct context *context)
+generate_seccomp_rules_file (scmp_filter_ctx seccomp)
 {
   int fd = -1;
-  if (context->seccomp)
+  if (seccomp)
     {
       fd = open ("/tmp", O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR);
       if (fd < 0)
@@ -417,7 +417,7 @@ generate_seccomp_rules_file (struct context *context)
             }
         }
 
-      if (seccomp_export_bpf (context->seccomp, fd) < 0)
+      if (seccomp_export_bpf (seccomp, fd) < 0)
         error (EXIT_FAILURE, errno, "error writing seccomp rules file");
       if (lseek (fd, 0, SEEK_SET) < 0)
         error (EXIT_FAILURE, errno, "error seeking seccomp rules file");

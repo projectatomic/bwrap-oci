@@ -22,6 +22,7 @@
 # include <glib.h>
 # include <unistd.h>
 # include <seccomp.h>
+# include "util.h"
 
 struct context
 {
@@ -42,8 +43,7 @@ struct context
 
   int userns_block_pipe[2];
 
-  uint32_t first_subuid, n_subuid;
-  uint32_t first_subgid, n_subgid;
+  struct user_mapping user_mapping;
 
   gboolean has_terminal;
   gboolean has_container_env;
