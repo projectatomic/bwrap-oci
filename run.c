@@ -770,12 +770,7 @@ run_container (const char *container_id,
   parser = json_parser_new ();
   json_parser_load_from_file (parser, configuration_file, &gerror);
   if (gerror)
-    {
-      g_print ("Unable to parse `%s': %s\n", configuration_file, gerror->message);
-      g_error_free (gerror);
-      g_object_unref (parser);
-      return EXIT_FAILURE;
-    }
+    error (EXIT_FAILURE, 0, "unable to parse `%s': %s", configuration_file, gerror->message);
 
   context->detach = detach;
 
