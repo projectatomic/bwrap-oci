@@ -41,38 +41,6 @@
 #include "subugidmap.h"
 #include "util.h"
 
-
-static void
-read_container_status_file (const char *path, pid_t *pid, char **bundlePath)
-{
-  GError *gerror = NULL;
-  JsonParser *parser;
-  JsonObject *root;
-  JsonNode *tmp;
-
-  parser = json_parser_new ();
-  json_parser_load_from_file (parser, path, &gerror);
-  if (gerror)
-    error (EXIT_FAILURE, 0, "unable to parse `%s': %s\n", path, gerror->message);
-
-  root = json_node_get_object (json_parser_get_root (parser));
-
-  tmp = json_object_get_member (root, "pid");
-  if (tmp)
-    *pid = json_node_get_int (tmp);
-  else
-    *pid = 0;
-
-  tmp = json_object_get_member (root, "bundlePath");
-  if (tmp)
-    *bundlePath = g_strdup (json_node_get_string (tmp));
-  else
-    *bundlePath = NULL;
-
-  if (gerror)
-    g_error_free (gerror);
-  g_object_unref (parser);
-}
 void
 list_containers ()
 {

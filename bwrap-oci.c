@@ -36,10 +36,10 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include "safe-read-write.h"
-#include "subugidmap.h"
 #include "util.h"
 #include "list.h"
 #include "run.h"
+#include "kill.h"
 
 static gboolean opt_dry_run;
 static gboolean opt_version;
@@ -117,6 +117,12 @@ main (int argc, char *argv[])
   else if (g_strcmp0 (cmd, "list") == 0)
     {
       list_containers ();
+    }
+  else if (g_strcmp0 (cmd, "kill") == 0)
+    {
+      if (argc < 4)
+        error (EXIT_FAILURE, 0, "kill needs two arguments");
+      kill_container (argv[2], argv[3]);
     }
   else
     {
