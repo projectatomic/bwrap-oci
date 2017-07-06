@@ -19,6 +19,33 @@
 # define _RUN_H
 # include <config.h>
 
+struct context
+{
+  GList *options;
+  GList *readonly_paths;
+  GList *args;
+  size_t total_elements;
+  gboolean remount_ro_rootfs;
+  scmp_filter_ctx seccomp;
+  gchar *rootfs;
+  GList *prestart_hooks;
+  GList *poststop_hooks;
+
+  uid_t uid;
+  gid_t gid;
+
+  gboolean has_user_mappings;
+
+  int userns_block_pipe[2];
+
+  struct user_mapping user_mapping;
+
+  gboolean has_terminal;
+  gboolean has_container_env;
+
+  gboolean detach;
+};
+
 int run_container (const char *container_id,
                    const char *configuration_file,
                    gboolean detach,
