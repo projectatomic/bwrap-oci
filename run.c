@@ -926,6 +926,11 @@ run_container (const char *container_id,
             char b;
             if (safe_read (sync_fd[0], &b, 1) < 0)
               error (0, errno, "error while waiting for bubblewrap to terminate");
+
+            /* The child process may have close'd the block_fd, so make sure the process
+               is really terminated.  If it is not do polling.  */
+            while (pid_running_p (child_pid))
+              sleep (1);
           }
 
           if (context->poststop_hooks)

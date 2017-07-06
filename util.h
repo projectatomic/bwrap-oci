@@ -45,5 +45,6 @@ void set_test_environment (gboolean status);
 int generate_seccomp_rules_file (scmp_filter_ctx seccomp);
 void set_bwrap_path (const char *bwrap);
 const char *get_bwrap_path ();
+gboolean pid_running_p (pid_t pid);
 
 #endif

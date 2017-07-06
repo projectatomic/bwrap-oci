@@ -424,3 +424,12 @@ generate_seccomp_rules_file (scmp_filter_ctx seccomp)
     }
   return fd;
 }
+
+gboolean
+pid_running_p (pid_t pid)
+{
+  if (pid == 0)
+    return FALSE;
+
+  return kill (pid, 0) == 0;
+}

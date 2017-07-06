@@ -73,16 +73,6 @@ read_container_status_file (const char *path, pid_t *pid, char **bundlePath)
     g_error_free (gerror);
   g_object_unref (parser);
 }
-
-static gboolean
-pid_running_p (pid_t pid)
-{
-  if (pid == 0)
-    return FALSE;
-
-  return kill (pid, 0) == 0;
-}
-
 void
 list_containers ()
 {
