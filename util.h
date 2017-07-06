@@ -24,7 +24,7 @@
 gchar *get_run_directory (void);
 guint64 get_seccomp_action (const char *name);
 uint32_t get_seccomp_operator (const char *name);
-gboolean bwrap_has_option (const char *opt_bwrap, const gchar *option);
+gboolean bwrap_has_option (const gchar *option);
 void write_container_state (const char *container_state, pid_t child_pid, const char *bundle_path);
 void detach_process ();
 void write_user_group_mappings (struct context *context, pid_t pid);
@@ -36,5 +36,7 @@ void delete_container (const char *name);
 void format_fd (gchar *buf, int fd);
 void set_test_environment (gboolean status);
 int generate_seccomp_rules_file (struct context *context);
+void set_bwrap_path (const char *bwrap);
+const char *get_bwrap_path ();
 
 #endif

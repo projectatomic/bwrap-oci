@@ -61,8 +61,6 @@ static GOptionEntry entries[] =
   { NULL }
 };
 
-#define HAS_OPTION(x) bwrap_has_option (opt_bwrap, (x))
-
 struct hook
 {
   const char *path;
@@ -243,7 +241,7 @@ do_linux (struct context *con, JsonNode *rootval)
   if (json_object_has_member (root, "mountLabel"))
     {
       JsonNode *label = json_object_get_member (root, "mountLabel");
-      if (HAS_OPTION ("--mount-label"))
+      if (bwrap_has_option ("--mount-label"))
         collect_options (con, "--mount-label", json_node_get_string (label), NULL);
       collect_options (con, "--file-label", json_node_get_string (label), NULL);
     }
@@ -379,7 +377,7 @@ do_root (struct context *con, JsonNode *rootval)
   con->rootfs = g_strdup (rootfs);
   if (readonly)
     {
-      if (HAS_OPTION ("remount-ro"))
+      if (bwrap_has_option ("remount-ro"))
         con->remount_ro_rootfs = TRUE;
       else
         error (0, 0, "warning: readonly rootfs are not supported yet");
@@ -389,7 +387,7 @@ do_root (struct context *con, JsonNode *rootval)
 static void
 do_hostname (struct context *con, JsonNode *rootval)
 {
-  if (HAS_OPTION ("hostname"))
+  if (bwrap_has_option ("hostname"))
     collect_options (con, "--hostname", json_node_get_string (rootval), NULL);
 }
 
@@ -582,7 +580,7 @@ static void
 do_process (struct context *con, JsonNode *rootval)
 {
   JsonObject *root = json_node_get_object (rootval);
-  if (json_object_has_member (root, "capabilities") && HAS_OPTION ("cap-add"))
+  if (json_object_has_member (root, "capabilities") && bwrap_has_option ("cap-add"))
     {
       JsonNode *capabilities = json_object_get_member (root, "capabilities");
       do_capabilities (con, capabilities);
@@ -694,7 +692,7 @@ generate_bwrap_argv (struct context *context)
   int current_list = 0;
   GList **lists[] = {&context->options, &context->readonly_paths, &context->args, NULL};
 
-  bwrap_argv[bwrap_argc++] = opt_bwrap;
+  bwrap_argv[bwrap_argc++] = g_strdup (get_bwrap_path ());
   while (lists[current_list])
     {
       GList *l = *lists[current_list];
@@ -757,7 +755,7 @@ initialize_user_mappings (struct context *context)
   char pipe_fmt[16];
   gboolean has_subuid_map, has_subgid_map;
 
-  if (!HAS_OPTION ("userns-block-fd"))
+  if (!bwrap_has_option ("userns-block-fd"))
     {
       context->has_user_mappings = FALSE;
       return context->has_user_mappings;
@@ -813,10 +811,10 @@ run_container (const char *container_id, gboolean detach)
   rootval = json_parser_get_root (parser);
   root = json_node_get_object (rootval);
 
-  if (HAS_OPTION ("as-pid-1"))
+  if (bwrap_has_option ("as-pid-1"))
     collect_options (context, "--as-pid-1", NULL);
 
-  if (HAS_OPTION ("die-with-parent"))
+  if (bwrap_has_option ("die-with-parent"))
     collect_options (context, "--die-with-parent", NULL);
 
   if (json_object_has_member (root, "root"))
@@ -827,7 +825,7 @@ run_container (const char *container_id, gboolean detach)
 
   if (opt_enable_hooks && json_object_has_member (root, "hooks"))
     {
-      if (HAS_OPTION ("block-fd") && HAS_OPTION ("info-fd"))
+      if (bwrap_has_option ("block-fd") && bwrap_has_option ("info-fd"))
         do_hooks (context, json_object_get_member (root, "hooks"));
     }
 
@@ -1016,6 +1014,7 @@ main (int argc, char *argv[])
     }
   if (opt_dry_run)
     set_test_environment (TRUE);
+  set_bwrap_path (opt_bwrap);
 
   if (argc > 1)
     cmd = argv[1];

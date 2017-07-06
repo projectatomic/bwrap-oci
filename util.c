@@ -64,6 +64,7 @@
 #endif
 
 static GHashTable *bwrap_options = NULL;
+static const gchar *bwrap_path = BWRAP;
 
 gchar *
 get_run_directory ()
@@ -134,10 +135,22 @@ get_seccomp_action (const char *name)
   return -1;
 }
 
-static void
-read_bwrap_help (const char *opt_bwrap)
+void
+set_bwrap_path (const char *path)
 {
-  const gchar *argv[] = {opt_bwrap, "--help", NULL};
+  bwrap_path = path;
+}
+
+const char *
+get_bwrap_path ()
+{
+  return bwrap_path;
+}
+
+static void
+read_bwrap_help ()
+{
+  const gchar *argv[] = {bwrap_path, "--help", NULL};
   gchar *output = NULL;
   gint exit_status;
   gchar *end, *it;
@@ -166,10 +179,10 @@ read_bwrap_help (const char *opt_bwrap)
 }
 
 gboolean
-bwrap_has_option (const char *opt_bwrap, const gchar *option)
+bwrap_has_option (const gchar *option)
 {
   if (bwrap_options == NULL)
-    read_bwrap_help (opt_bwrap);
+    read_bwrap_help ();
   return g_hash_table_contains (bwrap_options, option);
 }
 
