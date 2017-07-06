@@ -17,6 +17,7 @@
  */
 
 #include <config.h>
+#include "bwrap-oci.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <error.h>
@@ -26,7 +27,6 @@
 #include <json-glib/json-glib.h>
 #include <stdarg.h>
 #include <fcntl.h>
-#include <seccomp.h>
 #include <errno.h>
 #include <glib/gprintf.h>
 #include <string.h>
@@ -41,37 +41,13 @@
 #include "util.h"
 #include "list.h"
 
-
-/***
-  This part is taken from systemd:
-
-  Copyright 2010 Lennart Poettering
-*/
-#if defined __i386__ || defined __x86_64__
-
-/* The precise definition of __O_TMPFILE is arch specific, so let's
- * just define this on x86 where we know the value. */
-
-#ifndef __O_TMPFILE
-#define __O_TMPFILE     020000000
-#endif
-
-/* a horrid kludge trying to make sure that this will fail on old kernels */
-#ifndef O_TMPFILE
-#define O_TMPFILE (__O_TMPFILE | O_DIRECTORY)
-#endif
-
-#endif
-
-
 static gboolean opt_dry_run;
 static gboolean opt_version;
 static gboolean opt_enable_hooks;
 static const char *opt_configuration = "config.json";
 static char *opt_bwrap = BWRAP;
 static char *opt_pid_file;
-static char *opt_detach;
-static gboolean opt_test_environment;
+static gboolean opt_detach;
 
 static GOptionEntry entries[] =
 {
@@ -85,88 +61,13 @@ static GOptionEntry entries[] =
   { NULL }
 };
 
+#define HAS_OPTION(x) bwrap_has_option (opt_bwrap, (x))
+
 struct hook
 {
   const char *path;
   char **args;
 };
-
-struct context
-{
-  GList *options;
-  GList *readonly_paths;
-  GList *args;
-  size_t total_elements;
-  gboolean remount_ro_rootfs;
-  scmp_filter_ctx seccomp;
-  gchar *rootfs;
-  GList *prestart_hooks;
-  GList *poststop_hooks;
-
-  uid_t uid;
-  gid_t gid;
-
-  gboolean has_user_mappings;
-
-  int userns_block_pipe[2];
-
-  uint32_t first_subuid, n_subuid;
-  uint32_t first_subgid, n_subgid;
-
-  gboolean has_terminal;
-  gboolean has_container_env;
-};
-
-static void
-format_fd (gchar *buf, int fd)
-{
-  if (opt_test_environment || opt_dry_run)
-    g_sprintf (buf, "FD");
-  else
-    g_sprintf (buf, "%i", fd);
-}
-
-static uint32_t
-get_seccomp_operator (const char *name)
-{
-  if (g_strcmp0 (name, "SCMP_CMP_NE") == 0)
-    return SCMP_CMP_NE;
-  if (g_strcmp0 (name, "SCMP_CMP_LT") == 0)
-    return SCMP_CMP_LT;
-  if (g_strcmp0 (name, "SCMP_CMP_LE") == 0)
-    return SCMP_CMP_LE;
-  if (g_strcmp0 (name, "SCMP_CMP_EQ") == 0)
-    return SCMP_CMP_EQ;
-  if (g_strcmp0 (name, "SCMP_CMP_GE") == 0)
-    return SCMP_CMP_GE;
-  if (g_strcmp0 (name, "SCMP_CMP_GT") == 0)
-    return SCMP_CMP_GT;
-  if (g_strcmp0 (name, "SCMP_CMP_MASKED_EQ") == 0)
-    return SCMP_CMP_MASKED_EQ;
-  else
-    error (EXIT_FAILURE, 0, "unsupported seccomp operator %s\n", name);
-
-  return -1;
-}
-
-static guint64
-get_seccomp_action (const char *name)
-{
-  if (g_strcmp0 (name, "SCMP_ACT_KILL") == 0)
-    return SCMP_ACT_KILL;
-  if (g_strcmp0 (name, "SCMP_ACT_ALLOW") == 0)
-    return SCMP_ACT_ALLOW;
-  if (g_strcmp0 (name, "SCMP_ACT_TRAP") == 0)
-    return SCMP_ACT_TRAP;
-  if (g_strcmp0 (name, "SCMP_ACT_ERRNO") == 0)
-    return SCMP_ACT_ERRNO(EPERM);
-  if (g_strcmp0 (name, "SCMP_ACT_TRACE") == 0)
-    return SCMP_ACT_TRACE(EPERM);
-  else
-    error (EXIT_FAILURE, 0, "unsupported seccomp action %s\n", name);
-
-  return -1;
-}
 
 static GList *
 append_to_list (struct context *context, GList *list, va_list valist)
@@ -181,47 +82,6 @@ append_to_list (struct context *context, GList *list, va_list valist)
       context->total_elements++;
     }
   return list;
-}
-
-static GHashTable *bwrap_options = NULL;
-
-static void
-read_bwrap_help ()
-{
-  const gchar *argv[] = {opt_bwrap, "--help", NULL};
-  gchar *output = NULL;
-  gint exit_status;
-  gchar *end, *it;
-
-  if (g_spawn_sync (NULL, (gchar **) argv, NULL, G_SPAWN_DEFAULT, NULL,
-                    NULL, &output, NULL, &exit_status, NULL) == FALSE)
-    {
-      error (EXIT_FAILURE, errno, "error running bwrap --help");
-    }
-
-  bwrap_options = g_hash_table_new (g_str_hash, g_str_equal);
-
-  for (it = strstr (output, "    --"); it; it = strstr (end + 1, "    --"))
-    {
-      gchar *value;
-      end = strchr (it + 6, ' ');
-      if (end == NULL)
-        break;
-      *end = '\0';
-
-      value = g_strdup (it + 6);
-      g_hash_table_insert (bwrap_options, value, value);
-    }
-
-  g_free (output);
-}
-
-static gboolean
-bwrap_has_option (const gchar *option)
-{
-  if (bwrap_options == NULL)
-    read_bwrap_help ();
-  return g_hash_table_contains (bwrap_options, option);
 }
 
 static void
@@ -249,89 +109,6 @@ collect_args (struct context *context, ...)
   va_start (valist, context);
   context->args = append_to_list (context, context->args, valist);
   va_end (valist);
-}
-
-static gboolean
-file_exist_p (const char *root, const char *file)
-{
-  int res;
-  struct stat st;
-  gchar *fpath = g_strdup_printf ("%s%s", root, file);
-  res = lstat (fpath, &st);
-  g_free (fpath);
-  return res == 0;
-}
-
-static gboolean
-can_mask_or_ro_p (const char *path)
-{
-  int res;
-  struct stat st;
-
-  if (opt_test_environment)
-    return TRUE;
-
-  if (!g_str_has_prefix (path, "/sys") && !g_str_has_prefix (path, "/proc"))
-    return TRUE;
-
-  res = lstat (path, &st);
-  return res == 0 && !S_ISDIR (st.st_mode);
-}
-
-static gchar *
-get_bundle_path (const char *rootfs)
-{
-  gchar *ret, *tmp = g_strdup (rootfs);
-  ret = canonicalize_file_name(dirname (tmp));
-  g_free (tmp);
-  return ret;
-}
-
-static char *
-create_container (const char *name)
-{
-  struct stat st;
-  int r;
-  gchar *dir;
-  gchar *run_directory = get_run_directory ();
-  dir = g_strdup_printf ("%s/%s", run_directory, name);
-  g_free (run_directory);
-
-  r = lstat (dir, &st);
-  if (r == 0)
-    error (EXIT_FAILURE, 0, "container %s already exists", name);
-  if (r != 0 && errno != ENOENT)
-    error (EXIT_FAILURE, errno, "error lstat %s", dir);
-
-
-  if (mkdir (dir, 0700) < 0)
-    error (EXIT_FAILURE, errno, "error mkdir");
-
-  return dir;
-}
-
-static void
-delete_container (const char *name)
-{
-  gchar *dir, *status;
-  gchar *run_directory = get_run_directory ();
-  struct stat st;
-
-  dir = g_strdup_printf ("%s/%s", run_directory, name);
-  status = g_strdup_printf ("%s/%s/status.json", run_directory, name);
-
-  if (lstat (dir, &st) < 0 && errno == ENOENT)
-    error (EXIT_FAILURE, 0, "container %s does not exist", name);
-
-  if (unlink (status) < 0)
-    error (EXIT_FAILURE, errno, "unlink status file for container %s", name);
-
-  if (rmdir (dir) < 0)
-    error (EXIT_FAILURE, errno, "rmdir for container %s", name);
-
-  g_free (run_directory);
-  g_free (dir);
-  g_free (status);
 }
 
 static void
@@ -466,7 +243,7 @@ do_linux (struct context *con, JsonNode *rootval)
   if (json_object_has_member (root, "mountLabel"))
     {
       JsonNode *label = json_object_get_member (root, "mountLabel");
-      if (bwrap_has_option ("--mount-label"))
+      if (HAS_OPTION ("--mount-label"))
         collect_options (con, "--mount-label", json_node_get_string (label), NULL);
       collect_options (con, "--file-label", json_node_get_string (label), NULL);
     }
@@ -602,7 +379,7 @@ do_root (struct context *con, JsonNode *rootval)
   con->rootfs = g_strdup (rootfs);
   if (readonly)
     {
-      if (bwrap_has_option ("remount-ro"))
+      if (HAS_OPTION ("remount-ro"))
         con->remount_ro_rootfs = TRUE;
       else
         error (0, 0, "warning: readonly rootfs are not supported yet");
@@ -612,7 +389,7 @@ do_root (struct context *con, JsonNode *rootval)
 static void
 do_hostname (struct context *con, JsonNode *rootval)
 {
-  if (bwrap_has_option ("hostname"))
+  if (HAS_OPTION ("hostname"))
     collect_options (con, "--hostname", json_node_get_string (rootval), NULL);
 }
 
@@ -805,7 +582,7 @@ static void
 do_process (struct context *con, JsonNode *rootval)
 {
   JsonObject *root = json_node_get_object (rootval);
-  if (json_object_has_member (root, "capabilities") && bwrap_has_option ("cap-add"))
+  if (json_object_has_member (root, "capabilities") && HAS_OPTION ("cap-add"))
     {
       JsonNode *capabilities = json_object_get_member (root, "capabilities");
       do_capabilities (con, capabilities);
@@ -895,41 +672,15 @@ dump_argv (char **argv)
 }
 
 static void
-generate_seccomp_rules_file (struct context *context)
+finalize (struct context *context)
 {
-  if (context->seccomp)
+  int fd = generate_seccomp_rules_file (context);
+  if (fd >= 0)
     {
       char fdstr[10];
-      int fd = open ("/tmp", O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR);
-      if (fd < 0)
-        {
-          if (errno != EOPNOTSUPP)
-            error (EXIT_FAILURE, errno, "error opening temp file");
-          else
-            {
-              char *template = strdup ("/tmp/bwrap-oci-XXXXXX");
-              fd = mkstemp (template);
-              if (fd < 0)
-                error (EXIT_FAILURE, errno, "error opening temp file");
-              unlink (template);
-              free (template);
-            }
-        }
-
-      if (seccomp_export_bpf (context->seccomp, fd) < 0)
-        error (EXIT_FAILURE, errno, "error writing seccomp rules file");
-      if (lseek (fd, 0, SEEK_SET) < 0)
-        error (EXIT_FAILURE, errno, "error seeking seccomp rules file");
-
       format_fd (fdstr, fd);
       collect_options (context, "--seccomp", fdstr);
     }
-}
-
-static void
-finalize (struct context *context)
-{
-  generate_seccomp_rules_file (context);
 
   if (context->remount_ro_rootfs)
     add_readonly_path (context, "--remount-ro", "/", NULL);
@@ -1006,7 +757,7 @@ initialize_user_mappings (struct context *context)
   char pipe_fmt[16];
   gboolean has_subuid_map, has_subgid_map;
 
-  if (!bwrap_has_option ("userns-block-fd"))
+  if (!HAS_OPTION ("userns-block-fd"))
     {
       context->has_user_mappings = FALSE;
       return context->has_user_mappings;
@@ -1029,110 +780,8 @@ initialize_user_mappings (struct context *context)
   return context->has_user_mappings;
 }
 
-static void
-write_mapping (const char *program, pid_t pid, uint32_t host_id, uint32_t sandbox_id,
-               uint32_t first_subid, uint32_t n_subids)
-{
-  char arg_buffer[32][16];
-  const gchar *argv[32] = { 0 };
-  int argc = 0;
-  gint exit_status;
-
-#define APPEND_ARGUMENT(x)                        \
-  do                                              \
-    {                                             \
-      g_sprintf (arg_buffer[argc], "%i", x);      \
-      argv[argc] = arg_buffer[argc];              \
-      argc++;                                     \
-    } while (0)
-
-  argv[argc++] = program;
-  APPEND_ARGUMENT (pid);
-
-  if (sandbox_id == 0)
-    {
-      APPEND_ARGUMENT (sandbox_id);
-      APPEND_ARGUMENT (host_id);
-      APPEND_ARGUMENT (1);
-
-      APPEND_ARGUMENT (1);
-      APPEND_ARGUMENT (first_subid);
-      APPEND_ARGUMENT (n_subids);
-    }
-  else if (sandbox_id < n_subids)
-    {
-      APPEND_ARGUMENT (0);
-      APPEND_ARGUMENT (first_subid);
-      APPEND_ARGUMENT (sandbox_id);
-
-      APPEND_ARGUMENT (sandbox_id);
-      APPEND_ARGUMENT (host_id);
-      APPEND_ARGUMENT (1);
-
-      APPEND_ARGUMENT (sandbox_id + 1);
-      APPEND_ARGUMENT (first_subid + sandbox_id);
-      APPEND_ARGUMENT (n_subids - sandbox_id);
-    }
-  else
-    {
-      APPEND_ARGUMENT (0);
-      APPEND_ARGUMENT (first_subid);
-      APPEND_ARGUMENT (n_subids);
-
-      APPEND_ARGUMENT (sandbox_id);
-      APPEND_ARGUMENT (host_id);
-      APPEND_ARGUMENT (1);
-    }
-
-  argv[argc] = NULL;
-
-  if (g_spawn_sync (NULL, (gchar **) argv, NULL, G_SPAWN_DEFAULT, NULL,
-                    NULL, NULL, NULL, &exit_status, NULL) == FALSE ||
-      exit_status != 0)
-    {
-      error (EXIT_FAILURE, errno, "error running %s", program);
-    }
-}
-
-static void
-write_user_group_mappings (struct context *context, pid_t pid)
-{
-  uid_t uid = getuid ();
-  gid_t gid = getgid ();
-
-  write_mapping ("/usr/bin/newuidmap", pid, uid, context->uid,
-                 context->first_subuid, context->n_subuid);
-  write_mapping ("/usr/bin/newgidmap", pid, gid, context->gid,
-                 context->first_subgid, context->n_subgid);
-}
-
-static void
-detach_process ()
-{
-  setsid ();
-  if (fork () != 0)
-    _exit (EXIT_SUCCESS);
-}
-
-static void
-write_container_state (const char *container_state, pid_t child_pid, const char *bundle_path)
-{
-  gchar *path = g_strdup_printf ("%s/status.json", container_state);
-  FILE *f = fopen (path, "w");
-  if (f != NULL)
-    {
-      const char *fmt_stdin = "{\"pid\":%i, \"bundlePath\":\"%s\"}";
-      char *stdin = g_strdup_printf (fmt_stdin, child_pid, bundle_path);
-      fprintf (f, "%s", stdin);
-      g_free (stdin);
-      fclose (f);
-    }
-  g_free (path);
-}
-
-
 static int
-run_container (const char *container_id)
+run_container (const char *container_id, gboolean detach)
 {
   JsonNode *rootval;
   JsonObject *root;
@@ -1157,15 +806,17 @@ run_container (const char *container_id)
       return EXIT_FAILURE;
     }
 
+  context->detach = detach;
+
   initialize_user_mappings (context);
 
   rootval = json_parser_get_root (parser);
   root = json_node_get_object (rootval);
 
-  if (bwrap_has_option ("as-pid-1"))
+  if (HAS_OPTION ("as-pid-1"))
     collect_options (context, "--as-pid-1", NULL);
 
-  if (bwrap_has_option ("die-with-parent"))
+  if (HAS_OPTION ("die-with-parent"))
     collect_options (context, "--die-with-parent", NULL);
 
   if (json_object_has_member (root, "root"))
@@ -1176,7 +827,7 @@ run_container (const char *container_id)
 
   if (opt_enable_hooks && json_object_has_member (root, "hooks"))
     {
-      if (bwrap_has_option ("block-fd") && bwrap_has_option ("info-fd"))
+      if (HAS_OPTION ("block-fd") && HAS_OPTION ("info-fd"))
         do_hooks (context, json_object_get_member (root, "hooks"));
     }
 
@@ -1191,7 +842,7 @@ run_container (const char *container_id)
 
   g_object_unref (parser);
 
-  if (context->prestart_hooks || context->poststop_hooks || !opt_detach)
+  if (context->prestart_hooks || context->poststop_hooks || !context->detach)
     {
       char pipe_fmt[16];
       if (pipe (block_fd) != 0)
@@ -1200,7 +851,7 @@ run_container (const char *container_id)
       format_fd (pipe_fmt, block_fd[0]);
       collect_options (context, "--block-fd", pipe_fmt, NULL);
 
-      if (context->poststop_hooks || !opt_detach)
+      if (context->poststop_hooks || !context->detach)
         {
           if (pipe (sync_fd) != 0)
             error (EXIT_FAILURE, errno, "pipe");
@@ -1246,7 +897,7 @@ run_container (const char *container_id)
         {
           close (block_fd[0]);
         }
-      if (context->poststop_hooks || !opt_detach)
+      if (context->poststop_hooks || !context->detach)
         close (sync_fd[1]);
 
       detach_process ();
@@ -1290,7 +941,7 @@ run_container (const char *container_id)
           safe_write (context->userns_block_pipe[1], "1", 1);
         }
 
-      if (context->poststop_hooks || !opt_detach)
+      if (context->poststop_hooks || !context->detach)
         {
           stdin = g_strdup_printf (fmt_stdin, container_id, child_pid, rootfs, bundle_path);
           run_hooks (context->prestart_hooks, stdin);
@@ -1313,7 +964,7 @@ run_container (const char *container_id)
               g_free (stdin);
             }
 
-          if (!opt_detach)
+          if (!context->detach)
             delete_container (container_id);
         }
 
@@ -1327,7 +978,7 @@ run_container (const char *container_id)
           close (info_fd[0]);
           close (block_fd[1]);
         }
-      if (context->poststop_hooks || !opt_detach)
+      if (context->poststop_hooks || !context->detach)
         close (sync_fd[0]);
       if (context->has_user_mappings)
         close (context->userns_block_pipe[1]);
@@ -1335,7 +986,7 @@ run_container (const char *container_id)
       /* Wait for the first detach.  */
       while (waitpid (pid, &status, 0) < 0 && errno == EINTR);
 
-      if (opt_detach)
+      if (context->detach)
         detach_process ();
       execv (opt_bwrap, bwrap_argv);
     }
@@ -1350,7 +1001,6 @@ main (int argc, char *argv[])
   GOptionContext *opt_context;
   GError *gerror = NULL;
 
-  opt_test_environment = getenv ("TEST") ? TRUE : FALSE;
   opt_context = g_option_context_new ("- converter from OCI configuration to bubblewrap command line");
   g_option_context_add_main_entries (opt_context, entries, PACKAGE_STRING);
   if (!g_option_context_parse (opt_context, &argc, &argv, &gerror))
@@ -1364,6 +1014,8 @@ main (int argc, char *argv[])
       g_print ("%s\n", PACKAGE_STRING);
       exit (EXIT_SUCCESS);
     }
+  if (opt_dry_run)
+    set_test_environment (TRUE);
 
   if (argc > 1)
     cmd = argv[1];
@@ -1381,7 +1033,7 @@ main (int argc, char *argv[])
           id = g_strdup (basename (cwd));
           free (cwd);
         }
-      return run_container (id);
+      return run_container (id, opt_detach);
     }
   else if (g_strcmp0 (cmd, "delete") == 0)
     {

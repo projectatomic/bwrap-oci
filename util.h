@@ -18,8 +18,23 @@
 #ifndef _UTIL_H
 # define _UTIL_H
 # include <config.h>
+# include "bwrap-oci.h"
 # include <glib.h>
 
 gchar *get_run_directory (void);
+guint64 get_seccomp_action (const char *name);
+uint32_t get_seccomp_operator (const char *name);
+gboolean bwrap_has_option (const char *opt_bwrap, const gchar *option);
+void write_container_state (const char *container_state, pid_t child_pid, const char *bundle_path);
+void detach_process ();
+void write_user_group_mappings (struct context *context, pid_t pid);
+gboolean file_exist_p (const char *root, const char *file);
+gboolean can_mask_or_ro_p (const char *path);
+gchar *get_bundle_path (const char *rootfs);
+char *create_container (const char *name);
+void delete_container (const char *name);
+void format_fd (gchar *buf, int fd);
+void set_test_environment (gboolean status);
+int generate_seccomp_rules_file (struct context *context);
 
 #endif
