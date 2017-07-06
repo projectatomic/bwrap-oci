@@ -377,12 +377,21 @@ delete_container (const char *name)
   gchar *dir, *status;
   gchar *run_directory = get_run_directory ();
   struct stat st;
+  pid_t pid;
+  gchar *bundlePath = NULL;
 
   dir = g_strdup_printf ("%s/%s", run_directory, name);
   status = g_strdup_printf ("%s/%s/status.json", run_directory, name);
 
   if (lstat (dir, &st) < 0 && errno == ENOENT)
     error (EXIT_FAILURE, 0, "container %s does not exist", name);
+
+  read_container_status_file (status, &pid, &bundlePath);
+  if (pid_running_p (pid))
+    {
+      error (EXIT_FAILURE, 0, "can't delete a running container");
+    }
+  g_free (bundlePath);
 
   if (unlink (status) < 0)
     error (EXIT_FAILURE, errno, "unlink status file for container %s", name);
