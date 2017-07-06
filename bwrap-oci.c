@@ -39,6 +39,7 @@
 #include <dirent.h>
 #include "safe-read-write.h"
 #include "subugidmap.h"
+#include "util.h"
 
 
 /***
@@ -283,33 +284,6 @@ get_bundle_path (const char *rootfs)
   gchar *ret, *tmp = g_strdup (rootfs);
   ret = canonicalize_file_name(dirname (tmp));
   g_free (tmp);
-  return ret;
-}
-
-static gchar *
-get_run_directory ()
-{
-  gchar run_directory_buffer[64], *ret;
-  const char *root = getenv ("XDG_RUNTIME_DIR");
-  struct stat st;
-  int r;
-
-  if (root == NULL)
-    {
-      g_sprintf (run_directory_buffer, "/run/user/%d", getuid ());
-      root = run_directory_buffer;
-    }
-
-
-  ret = g_strdup_printf ("%s/%s", root, "bwrap-oci");
-  r = lstat (ret, &st);
-  if (r != 0)
-    {
-      if (errno == ENOENT)
-        mkdir (ret, 0700);
-      else
-        error (EXIT_FAILURE, errno, "error lstat %s", ret);
-    }
   return ret;
 }
 

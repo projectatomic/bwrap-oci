@@ -34,6 +34,7 @@ bin_PROGRAMS = bwrap-oci
 bwrap_oci_SOURCES = \
 	bwrap-oci.c \
 	safe-read-write.c \
+	util.c \
 	subugidmap.c \
 	$(NULL)
 
