@@ -178,7 +178,6 @@ do_linux (struct context *con, JsonNode *rootval)
             collect_options (con, "--unshare-uts", NULL);
           else
             error (EXIT_FAILURE, 0, "unknown namespace %s\n", typeval);
-          g_variant_unref (variant);
         }
     }
   if (json_object_has_member (root, "maskedPaths"))
@@ -196,7 +195,6 @@ do_linux (struct context *con, JsonNode *rootval)
           if (can_mask_or_ro_p (path))
             add_readonly_path (con, "--bind", "/dev/null", path, NULL);
 
-          g_variant_unref (variant);
         }
     }
   if (json_object_has_member (root, "readonlyPaths"))
@@ -213,8 +211,6 @@ do_linux (struct context *con, JsonNode *rootval)
 
           if (can_mask_or_ro_p (path))
             add_readonly_path (con, "--ro-bind", path, path, NULL);
-
-          g_variant_unref (variant);
         }
     }
   if (json_object_has_member (root, "mountLabel"))
@@ -327,14 +323,10 @@ do_linux (struct context *con, JsonNode *rootval)
                                                 n_arg,
                                                 arg_cmp);
                   if (ret < 0)
-                    {
                       error (EXIT_FAILURE, -ret, "error while setting up seccomp");
-                    }
-
                 }
 
               g_free (name);
-              g_variant_unref (name_variant);
             }
         }
     }
@@ -501,7 +493,6 @@ do_mounts (struct context *con, JsonNode *rootval)
         }
       else
         error (EXIT_FAILURE, 0, "unknown mount type %s\n", typeval);
-      g_variant_unref (variant);
     }
 
   check_required_mounts (con, explicit_mounts);
@@ -531,7 +522,6 @@ do_capabilities (struct context *con, JsonNode *rootval)
           const char *cap = g_variant_get_string (v, NULL);
 
           g_hash_table_insert (needed_caps, g_strdup (cap), g_strdup (cap));
-          g_variant_unref (v);
         }
       g_list_free (members);
     }
@@ -590,7 +580,6 @@ do_process (struct context *con, JsonNode *rootval)
           if (g_strcmp0 (val, "container") == 0)
             con->has_container_env = TRUE;
           g_free (val);
-          g_variant_unref (env);
         }
       g_list_free (members);
     }
