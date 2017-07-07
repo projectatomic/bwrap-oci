@@ -1,6 +1,6 @@
 Summary: Run OCI containers with bubblewrap
 Name: bwrap-oci
-Version: 0.1.1
+Version: #VERSION#
 Release: 5%{?dist}
 Source0: %{url}/archive/%{name}-%{version}.tar.gz
 License: LGPLv2+
@@ -21,7 +21,7 @@ BuildRequires: pkgconfig(gio-unix-2.0)
 bwrap-oci uses Bubblewrap to run a container from an OCI spec file.
 
 %prep
-%autosetup -n %{name}-%{name}-%{version}
+%autosetup -n %{name}-%{version}
 
 %build
 env NOCONFIGURE=1 ./autogen.sh
