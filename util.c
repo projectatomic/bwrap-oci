@@ -66,6 +66,21 @@
 static GHashTable *bwrap_options = NULL;
 static const gchar *bwrap_path = BWRAP;
 
+void
+cleanup_freep (void *p)
+{
+  void **pp = (void **) p;
+  free (*pp);
+}
+
+void
+cleanup_filep (FILE **f)
+{
+  FILE *file = *f;
+  if (file)
+    (void) fclose (file);
+}
+
 gchar *
 get_run_directory ()
 {

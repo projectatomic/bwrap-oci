@@ -21,6 +21,14 @@
 # include <glib.h>
 # include <unistd.h>
 # include <seccomp.h>
+# include <stdio.h>
+# include <stdlib.h>
+
+void cleanup_freep (void *p);
+void cleanup_filep (FILE **f);
+
+#define cleanup_free __attribute__((cleanup (cleanup_freep)))
+#define cleanup_file __attribute__((cleanup (cleanup_filep)))
 
 struct user_mapping
 {

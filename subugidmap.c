@@ -18,6 +18,7 @@
 
 #include <config.h>
 #include "subugidmap.h"
+#include "util.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -30,24 +31,6 @@
 #include <sys/stat.h>
 #include <pwd.h>
 #include <grp.h>
-
-static void
-cleanup_freep (void *p)
-{
-  void **pp = (void **) p;
-  free (*pp);
-}
-
-static void
-cleanup_file (FILE **f)
-{
-  FILE *file = *f;
-  if (file)
-    (void) fclose (file);
-}
-
-#define cleanup_free __attribute__((cleanup (cleanup_freep)))
-#define cleanup_file __attribute__((cleanup (cleanup_file)))
 
 /*if subuid or subgid exist, take the first range for the user */
 int
