@@ -44,7 +44,7 @@
 void
 list_containers ()
 {
-  gchar *run_directory = get_run_directory ();
+  cleanup_free gchar *run_directory = get_run_directory ();
   DIR *dir = opendir (run_directory);
   struct dirent *dp;
   if (dir == NULL)
@@ -60,7 +60,8 @@ list_containers ()
   printf ("%-30s%-10s%-10s%s\n", "NAME", "PID", "STATUS", "BUNDLE");
   do
     {
-      gchar *path, *bundlePath;
+      cleanup_free gchar *path = NULL;
+      cleanup_free gchar *bundlePath = NULL;
       const char *process_status;
       pid_t pid;
 
@@ -75,13 +76,9 @@ list_containers ()
           process_status = pid_running_p (pid) ? "running" : "stopped";
 
           printf ("%-30s%-10d%-10s%s\n", dp->d_name, pid, process_status, bundlePath ? : "(none)");
-
-          g_free (path);
-          g_free (bundlePath);
         }
   }
   while (dp != NULL);
 
   closedir (dir);
-  g_free (run_directory);
 }
