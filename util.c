@@ -333,9 +333,8 @@ file_exist_p (const char *root, const char *file)
 {
   int res;
   struct stat st;
-  gchar *fpath = g_strdup_printf ("%s%s", root, file);
+  cleanup_free gchar *fpath = g_strdup_printf ("%s%s", root, file);
   res = lstat (fpath, &st);
-  g_free (fpath);
   return res == 0;
 }
 
@@ -358,9 +357,9 @@ can_mask_or_ro_p (const char *path)
 gchar *
 get_bundle_path (const char *rootfs)
 {
-  gchar *ret, *tmp = g_strdup (rootfs);
+  gchar *ret;
+  cleanup_free gchar *tmp = g_strdup (rootfs);
   ret = canonicalize_file_name(dirname (tmp));
-  g_free (tmp);
   return ret;
 }
 
@@ -370,9 +369,8 @@ create_container (const char *name)
   struct stat st;
   int r;
   gchar *dir;
-  gchar *run_directory = get_run_directory ();
+  cleanup_free gchar *run_directory = get_run_directory ();
   dir = g_strdup_printf ("%s/%s", run_directory, name);
-  g_free (run_directory);
 
   r = lstat (dir, &st);
   if (r == 0)
@@ -390,8 +388,9 @@ create_container (const char *name)
 void
 delete_container (const char *name)
 {
-  gchar *dir, *status;
-  gchar *run_directory = get_run_directory ();
+  cleanup_free gchar *dir = NULL;
+  cleanup_free gchar *status = NULL;
+  cleanup_free gchar *run_directory = get_run_directory ();
   struct stat st;
   pid_t pid;
   gchar *bundlePath = NULL;
@@ -414,10 +413,6 @@ delete_container (const char *name)
 
   if (rmdir (dir) < 0)
     error (EXIT_FAILURE, errno, "rmdir for container %s", name);
-
-  g_free (run_directory);
-  g_free (dir);
-  g_free (status);
 }
 
 int
