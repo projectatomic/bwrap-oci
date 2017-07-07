@@ -245,7 +245,7 @@ do_linux (struct context *con, JsonNode *rootval)
               int ret;
               uint32_t arch_token;
               const char *arch = json_node_get_string (iter->data);
-              gchar *arch_lowercase;
+              cleanup_free gchar *arch_lowercase = NULL;
 
               if (g_str_has_prefix (arch, "SCMP_ARCH_"))
                 arch += 10;
@@ -257,7 +257,6 @@ do_linux (struct context *con, JsonNode *rootval)
               ret = seccomp_arch_add (con->seccomp, arch_token);
               if (ret < 0 && ret != -EEXIST)
                 error (EXIT_FAILURE, errno, "error while setting up seccomp");
-              g_free (arch_lowercase);
             }
         }
 
@@ -278,7 +277,7 @@ do_linux (struct context *con, JsonNode *rootval)
 
           for (name_it = 0; name_it < g_variant_n_children (names); name_it++)
             {
-              char *name = NULL;
+              cleanup_free char *name = NULL;
               GVariant *name_variant = g_variant_get_child_value (g_variant_get_child_value (names, name_it), 0);
               g_variant_get (name_variant, "s", &name);
               if (args == NULL)
@@ -325,8 +324,6 @@ do_linux (struct context *con, JsonNode *rootval)
                   if (ret < 0)
                       error (EXIT_FAILURE, -ret, "error while setting up seccomp");
                 }
-
-              g_free (name);
             }
         }
     }
@@ -571,7 +568,7 @@ do_process (struct context *con, JsonNode *rootval)
       for (iter = members; iter; iter = iter->next)
         {
           GVariant *env = json_gvariant_deserialize (iter->data, "s", NULL);
-          char *val = g_variant_dup_string (env, NULL);
+          cleanup_free char *val = g_variant_dup_string (env, NULL);
           gchar *sep = g_strrstr (val, "=");
           if (!sep)
             error (EXIT_FAILURE, 0, "invalid env setting\n");
@@ -579,7 +576,6 @@ do_process (struct context *con, JsonNode *rootval)
           collect_options (con, "--setenv", val, sep + 1, NULL);
           if (g_strcmp0 (val, "container") == 0)
             con->has_container_env = TRUE;
-          g_free (val);
         }
       g_list_free (members);
     }
@@ -595,18 +591,16 @@ do_process (struct context *con, JsonNode *rootval)
       if (json_object_has_member (userobj, "uid"))
         {
           gint64 uid = json_node_get_int (json_object_get_member (userobj, "uid"));
-          gchar *argument = g_strdup_printf ("%" G_GINT64_FORMAT, uid);
+          cleanup_free gchar *argument = g_strdup_printf ("%" G_GINT64_FORMAT, uid);
           collect_options (con, "--uid", argument, NULL);
           con->uid = uid;
-          g_free (argument);
         }
       if (json_object_has_member (userobj, "gid"))
         {
           gint64 gid = json_node_get_int (json_object_get_member (userobj, "gid"));
-          gchar *argument = g_strdup_printf ("%" G_GINT64_FORMAT, gid);
+          cleanup_free gchar *argument = g_strdup_printf ("%" G_GINT64_FORMAT, gid);
           collect_options (con, "--gid", argument, NULL);
           con->gid = gid;
-          g_free (argument);
         }
     }
   if (json_object_has_member (root, "args"))
@@ -763,7 +757,7 @@ run_container (const char *container_id,
   int info_fd[2];
   int sync_fd[2];
   pid_t pid;
-  char *container_state;
+  cleanup_free char *container_state = NULL;
   char pipe_fmt[16];
 
   context = g_new0 (struct context, 1);
@@ -844,7 +838,7 @@ run_container (const char *container_id,
   if (pid == 0)
     {
       gchar *rootfs = context->rootfs;
-      gchar *stdin;
+      cleanup_free gchar *stdin = NULL;
       gchar *bundle_path;
       gint64 child_pid = 0;
       const char *fmt_stdin = "{\"ociVersion\":\"1.0\", \"id\":\"%s\", \"pid\":%i, \"root\":\"%s\", \"bundlePath\":\"%s\"}";
@@ -881,7 +875,6 @@ run_container (const char *container_id,
       }
 
       write_container_state (container_state, child_pid, bundle_path);
-      g_free (container_state);
 
       if (pid_file)
         {
@@ -902,7 +895,6 @@ run_container (const char *container_id,
         {
           stdin = g_strdup_printf (fmt_stdin, container_id, child_pid, rootfs, bundle_path);
           run_hooks (context->prestart_hooks, stdin);
-          g_free (stdin);
 
           if (safe_write (block_fd[1], "1", 1) < 0)
             error (0, errno, "error while unblocking the bubblewrap process");
@@ -923,7 +915,6 @@ run_container (const char *container_id,
             {
               stdin = g_strdup_printf (fmt_stdin, container_id, 0, rootfs, bundle_path);
               run_hooks (context->poststop_hooks, stdin);
-              g_free (stdin);
             }
 
           if (!context->detach)
