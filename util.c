@@ -303,13 +303,14 @@ set_test_environment (gboolean status)
   test_environment = status;
 }
 
-void
+gchar *
 format_fd (gchar *buf, int fd)
 {
   if (test_environment_p ())
     g_sprintf (buf, "FD");
   else
     g_sprintf (buf, "%i", fd);
+  return buf;
 }
 
 gboolean

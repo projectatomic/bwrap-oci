@@ -40,7 +40,7 @@ gboolean can_mask_or_ro_p (const char *path);
 gchar *get_bundle_path (const char *rootfs);
 char *create_container (const char *name);
 void delete_container (const char *name);
-void format_fd (gchar *buf, int fd);
+gchar *format_fd (gchar *buf, int fd);
 void set_test_environment (gboolean status);
 int generate_seccomp_rules_file (scmp_filter_ctx seccomp);
 void set_bwrap_path (const char *bwrap);

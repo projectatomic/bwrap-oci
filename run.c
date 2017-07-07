@@ -643,9 +643,8 @@ finalize (struct context *context)
   int fd = generate_seccomp_rules_file (context->seccomp);
   if (fd >= 0)
     {
-      char fdstr[10];
-      format_fd (fdstr, fd);
-      collect_options (context, "--seccomp", fdstr);
+      char fdstr[16];
+      collect_options (context, "--seccomp", format_fd (fdstr, fd));
     }
 
   if (context->remount_ro_rootfs)
@@ -765,6 +764,7 @@ run_container (const char *container_id,
   int sync_fd[2];
   pid_t pid;
   char *container_state;
+  char pipe_fmt[16];
 
   context = g_new0 (struct context, 1);
   parser = json_parser_new ();
@@ -810,31 +810,22 @@ run_container (const char *container_id,
 
   if (context->prestart_hooks || context->poststop_hooks || !context->detach)
     {
-      char pipe_fmt[16];
       if (pipe (block_fd) != 0)
         error (EXIT_FAILURE, errno, "pipe");
 
-      format_fd (pipe_fmt, block_fd[0]);
-      collect_options (context, "--block-fd", pipe_fmt, NULL);
+      collect_options (context, "--block-fd", format_fd (pipe_fmt, block_fd[0]), NULL);
 
       if (context->poststop_hooks || !context->detach)
         {
           if (pipe (sync_fd) != 0)
             error (EXIT_FAILURE, errno, "pipe");
-          format_fd (pipe_fmt, sync_fd[1]);
-          collect_options (context, "--sync-fd", pipe_fmt, NULL);
+          collect_options (context, "--sync-fd", format_fd (pipe_fmt, sync_fd[1]), NULL);
         }
     }
 
-  {
-    char pipe_fmt[16];
-
-    if (pipe (info_fd) != 0)
-      error (EXIT_FAILURE, errno, "pipe");
-
-    format_fd (pipe_fmt, info_fd[1]);
-    collect_options (context, "--info-fd", pipe_fmt, NULL);
-  }
+  if (pipe (info_fd) != 0)
+    error (EXIT_FAILURE, errno, "pipe");
+  collect_options (context, "--info-fd", format_fd (pipe_fmt, info_fd[1]), NULL);
 
   finalize (context);
   bwrap_argv = generate_bwrap_argv (context);
