@@ -753,9 +753,9 @@ run_container (const char *container_id,
   struct context *context;
   char **bwrap_argv = NULL;
   JsonParser *parser;
-  int block_fd[2];
-  int info_fd[2];
-  int sync_fd[2];
+  int block_fd[2] = {-1, -1};
+  int info_fd[2] = {-1, -1};
+  int sync_fd[2] = {-1, -1};
   pid_t pid;
   cleanup_free char *container_state = NULL;
   char pipe_fmt[16];
