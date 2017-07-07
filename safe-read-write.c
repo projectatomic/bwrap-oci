@@ -31,13 +31,13 @@
     }                                                   \
   while (0)
 
-size_t
+ssize_t
 safe_read (int fd, void *buf, size_t count)
 {
   safe_io_op(read);
 }
 
-size_t
+ssize_t
 safe_write (int fd, const void *buf, size_t count)
 {
   safe_io_op(write);
