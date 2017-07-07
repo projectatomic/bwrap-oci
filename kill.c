@@ -26,10 +26,10 @@
 void
 kill_container (const char *name, const char *signal)
 {
-  gchar *path;
-  gchar *run_directory = get_run_directory ();
+  cleanup_free gchar *run_directory = get_run_directory ();
+  cleanup_free gchar *path = NULL;
+  cleanup_free char *bundlePath = NULL;
   pid_t pid;
-  char *bundlePath = NULL;
   int r;
   long signal_value;
   char *endptr = NULL;
@@ -52,9 +52,4 @@ kill_container (const char *name, const char *signal)
   r = kill (pid, signal_value);
   if (r < 0)
     error (EXIT_FAILURE, errno, "kill %lu", signal_value);
-
-  if (bundlePath)
-    g_free (bundlePath);
-  g_free (path);
-  g_free (run_directory);
 }
