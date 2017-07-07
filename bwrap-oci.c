@@ -95,11 +95,10 @@ main (int argc, char *argv[])
         id = argv[2];
       else
         {
-          char *cwd = get_current_dir_name ();
+          cleanup_free char *cwd = get_current_dir_name ();
           if (cwd == NULL)
             error (EXIT_FAILURE, errno, "error cwd");
           id = g_strdup (basename (cwd));
-          free (cwd);
         }
       return run_container (id, opt_configuration,
                             opt_detach,
