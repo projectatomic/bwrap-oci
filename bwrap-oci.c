@@ -61,6 +61,14 @@ static GOptionEntry entries[] =
   { NULL }
 };
 
+static const char *summary = "\
+List of commands:                                               \
+\n  delete CONTAINER - delete a stopped container               \
+\n  list - list current containers                              \
+\n  run [CONTAINER] - run a container with id CONTAINER           \
+\n  kill CONTAINER SIGNAL - kill CONTAINER with signal SIGNAL   \
+";
+
 int
 main (int argc, char *argv[])
 {
@@ -68,7 +76,10 @@ main (int argc, char *argv[])
   GOptionContext *opt_context;
   GError *gerror = NULL;
 
-  opt_context = g_option_context_new ("- converter from OCI configuration to bubblewrap command line");
+  opt_context = g_option_context_new ("[COMMAND] [ARGUMENTS] - converter from OCI configuration to bubblewrap command line");
+
+  g_option_context_set_summary (opt_context, summary);
+
   g_option_context_add_main_entries (opt_context, entries, PACKAGE_STRING);
   if (!g_option_context_parse (opt_context, &argc, &argv, &gerror))
     {
