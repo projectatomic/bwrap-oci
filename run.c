@@ -841,7 +841,7 @@ run_container (const char *container_id,
       cleanup_free gchar *stdin = NULL;
       gchar *bundle_path;
       gint64 child_pid = 0;
-      const char *fmt_stdin = "{\"ociVersion\":\"1.0\", \"id\":\"%s\", \"pid\":%i, \"root\":\"%s\", \"bundlePath\":\"%s\"}";
+      const char *fmt_stdin = "{\"ociVersion\":\"1.0\", \"id\":\"%s\", \"pid\":%i, \"root\":\"%s\", \"bundle\":\"%s\"}";
 
       close (info_fd[1]);
       if (context->prestart_hooks)
