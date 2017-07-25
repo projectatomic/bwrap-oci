@@ -44,6 +44,7 @@
 static gboolean opt_dry_run;
 static gboolean opt_version;
 static gboolean opt_enable_hooks;
+static gboolean opt_systemd_cgroup;
 static const char *opt_configuration = "config.json";
 static char *opt_bwrap = BWRAP;
 static char *opt_pid_file;
@@ -56,6 +57,7 @@ static GOptionEntry entries[] =
   { "enable-hooks", 0, 0, G_OPTION_ARG_NONE, &opt_enable_hooks, "Execute the OCI hooks", NULL },
   { "detach", 'd', 0, G_OPTION_ARG_NONE, &opt_detach, "Do not wait for termination", NULL },
   { "version", 0, 0, G_OPTION_ARG_NONE, &opt_version, "Print version information and exit", NULL },
+  { "systemd-cgroup", 0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_NONE, &opt_systemd_cgroup, "Use systemd cgroup", NULL}, /* noop, added for compatibility with runC.  */
   { "bwrap", 0, 0, G_OPTION_ARG_STRING, &opt_bwrap, "Specify the path to the bubblewrap executable to use", "PATH" },
   { "pid-file", 0, 0, G_OPTION_ARG_STRING, &opt_pid_file, "Specify the path to the file where write the PID of the sandboxed process", "PIDFILE" },
   { NULL }
