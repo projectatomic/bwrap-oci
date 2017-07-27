@@ -1,0 +1,31 @@
+container:
+  image: registry.fedoraproject.org/fedora:26
+
+packages:
+    - autoconf
+    - automake
+    - make
+    - gcc
+    - git
+    - pkgconfig(json-glib-1.0)
+    - libseccomp-devel
+    - libxslt
+    - bubblewrap
+    - docbook-style-xsl
+    - pkgconfig(gio-unix-2.0)
+
+build: true
+
+tests:
+    - make syntax-check
+    - make check
+
+branches:
+  - master
+  - auto
+  - try
+
+timeout: 30m
+
+artifacts:
+    - test-suite.log
