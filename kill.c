@@ -28,7 +28,6 @@ kill_container (const char *name, const char *signal)
 {
   cleanup_free gchar *run_directory = get_run_directory ();
   cleanup_free gchar *path = NULL;
-  cleanup_free char *bundlePath = NULL;
   pid_t pid;
   int r;
   long signal_value;
@@ -39,7 +38,7 @@ kill_container (const char *name, const char *signal)
   if (! file_exist_p ("", path))
     error (EXIT_FAILURE, 0, "container %s doesn't exist", name);
 
-  read_container_status_file (path, &pid, &bundlePath);
+  read_container_status_file (path, &pid, NULL);
 
   if (pid == 0)
     error (EXIT_FAILURE, 0, "container %s doesn't exist", name);

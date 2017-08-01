@@ -393,7 +393,6 @@ delete_container (const char *name)
   cleanup_free gchar *run_directory = get_run_directory ();
   struct stat st;
   pid_t pid;
-  gchar *bundlePath = NULL;
 
   dir = g_strdup_printf ("%s/%s", run_directory, name);
   status = g_strdup_printf ("%s/%s/status.json", run_directory, name);
@@ -401,12 +400,11 @@ delete_container (const char *name)
   if (lstat (dir, &st) < 0 && errno == ENOENT)
     error (EXIT_FAILURE, 0, "container %s does not exist", name);
 
-  read_container_status_file (status, &pid, &bundlePath);
+  read_container_status_file (status, &pid, NULL);
   if (pid_running_p (pid))
     {
       error (EXIT_FAILURE, 0, "can't delete a running container");
     }
-  g_free (bundlePath);
 
   if (unlink (status) < 0)
     error (EXIT_FAILURE, errno, "unlink status file for container %s", name);
@@ -460,17 +458,21 @@ read_container_status_file (const char *path, pid_t *pid, char **bundlePath)
 
   root = json_node_get_object (json_parser_get_root (parser));
 
-  tmp = json_object_get_member (root, "pid");
-  if (tmp)
-    *pid = json_node_get_int (tmp);
-  else
-    *pid = 0;
+  if (pid) {
+    tmp = json_object_get_member (root, "pid");
+    if (tmp)
+      *pid = json_node_get_int (tmp);
+    else
+      *pid = 0;
+  }
 
-  tmp = json_object_get_member (root, "bundlePath");
-  if (tmp)
-    *bundlePath = g_strdup (json_node_get_string (tmp));
-  else
-    *bundlePath = NULL;
+  if (bundlePath) {
+    tmp = json_object_get_member (root, "bundlePath");
+    if (tmp)
+      *bundlePath = g_strdup (json_node_get_string (tmp));
+    else
+      *bundlePath = NULL;
+  }
 
   if (gerror)
     g_error_free (gerror);
