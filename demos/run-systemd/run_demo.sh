@@ -2,7 +2,7 @@
 
 rm -rf cache
 mkdir cache
-bwrap --ro-bind / / --dev /dev --proc /proc --bind $(pwd) $(pwd) skopeo copy docker://fedora oci:cache
+bwrap --ro-bind / / --dev /dev --proc /proc --bind $(pwd) $(pwd) skopeo copy docker://fedora oci:cache:latest
 
 mkdir rootfs
 
