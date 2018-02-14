@@ -305,7 +305,7 @@
 		"noexec",
 		"nodev",
 		"relatime",
-		"ro"
+		"rw"
 	    ]
 	}
     ],

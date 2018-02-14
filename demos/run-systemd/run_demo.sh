@@ -18,7 +18,7 @@ mkdir rootfs
 
 bwrap --uid 0 --gid 0 --unshare-user --bind rootfs / --dev /dev --proc /proc --tmpfs /run --tmpfs /var --tmpfs /var/log systemd-tmpfiles --create
 
-bwrap --uid 0 --gid 0 --unshare-user --bind rootfs / --dev /dev --proc /proc --tmpfs /run --tmpfs /var --tmpfs /var/log systemctl mask dev-hugepages.mount
+bwrap --uid 0 --gid 0 --unshare-user --bind rootfs / --dev /dev --proc /proc --tmpfs /run --tmpfs /var --tmpfs /var/log systemctl mask dev-hugepages.mount systemd-update-utmp.service systemd-tmpfiles-setup.service
 
 systemd-run --user --scope bwrap-oci --pid-file=/tmp/pidfile
 
