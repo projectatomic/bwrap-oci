@@ -152,6 +152,7 @@ do_linux (struct context *con, JsonNode *rootval)
       GList *iter;
       namespaces = json_object_get_member (root, "namespaces");
       members = json_array_get_elements (json_node_get_array (namespaces));
+      collect_options (con, "--unshare-cgroup", NULL);
       for (iter = members; iter; iter = iter->next)
         {
           const char *typeval;
@@ -172,8 +173,6 @@ do_linux (struct context *con, JsonNode *rootval)
             ;
           else if (g_strcmp0 (typeval, "network") == 0)
             collect_options (con, "--unshare-net", NULL);
-          else if (g_strcmp0 (typeval, "cgroup") == 0)
-            collect_options (con, "--unshare-cgroup", NULL);
           else if (g_strcmp0 (typeval, "uts") == 0)
             collect_options (con, "--unshare-uts", NULL);
           else
