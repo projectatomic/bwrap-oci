@@ -48,6 +48,7 @@ static gboolean opt_systemd_cgroup;
 static const char *opt_configuration = "config.json";
 static char *opt_bwrap = BWRAP;
 static char *opt_pid_file;
+static char *opt_bundle;
 static gboolean opt_detach;
 
 static GOptionEntry entries[] =
@@ -60,6 +61,7 @@ static GOptionEntry entries[] =
   { "systemd-cgroup", 0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_NONE, &opt_systemd_cgroup, "Use systemd cgroup", NULL}, /* noop, added for compatibility with runC.  */
   { "bwrap", 0, 0, G_OPTION_ARG_STRING, &opt_bwrap, "Specify the path to the bubblewrap executable to use", "PATH" },
   { "pid-file", 0, 0, G_OPTION_ARG_STRING, &opt_pid_file, "Specify the path to the file where write the PID of the sandboxed process", "PIDFILE" },
+  { "bundle", 'b', 0, G_OPTION_ARG_STRING, &opt_bundle, "Specify the path to the bundle", "PATH" },
   { NULL }
 };
 
@@ -104,6 +106,10 @@ main (int argc, char *argv[])
   if (g_strcmp0 (cmd, "run") == 0)
     {
       const char *id;
+
+      if (opt_bundle && chdir (opt_bundle) < 0)
+        error (EXIT_FAILURE, errno, "chdir");
+
       if (argc > 2)
         id = argv[2];
       else
