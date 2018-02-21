@@ -753,6 +753,8 @@ initialize_user_mappings (struct context *context)
     error (EXIT_FAILURE, 0, "invalid configuration for subuids and subgids");
 
   context->has_user_mappings = has_subuid_map;
+  if (!context->has_user_mappings)
+    return FALSE;
 
   if (pipe (context->userns_block_pipe) < 0)
     error (EXIT_FAILURE, errno, "pipe");
