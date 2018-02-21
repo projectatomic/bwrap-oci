@@ -297,14 +297,15 @@ do_linux (struct context *con, JsonNode *rootval)
                   for (child = 0; child < 6 && child < g_variant_n_children (args); child++)
                     {
                       GVariant *valuevar, *valueTwovar, *opvar;
-                      guint64 value, valueTwo;
+                      guint64 value, valueTwo = 0;
                       const char *op = NULL;
                       GVariant *arg = g_variant_get_variant (g_variant_get_child_value (args, child));
 
                       valuevar = g_variant_lookup_value (arg, "value", G_VARIANT_TYPE_INT64);
                       value = g_variant_get_int64 (valuevar);
                       valueTwovar = g_variant_lookup_value (arg, "valueTwo", G_VARIANT_TYPE_INT64);
-                      valueTwo = g_variant_get_int64 (valueTwovar);
+                      if (valueTwovar)
+                        valueTwo = g_variant_get_int64 (valueTwovar);
                       opvar = g_variant_lookup_value (arg, "op", G_VARIANT_TYPE_STRING);
                       op = g_variant_get_string (opvar, NULL);
 
