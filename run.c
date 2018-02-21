@@ -880,7 +880,7 @@ run_container (const char *container_id,
         {
           FILE *pidfile = fopen (pid_file, "w");
           if (pidfile == NULL)
-            error (EXIT_FAILURE, errno, "error openening pid file");
+            error (EXIT_FAILURE, errno, "error opening pid file");
           fprintf (pidfile, "%" G_GINT64_FORMAT "\n", child_pid);
           fclose (pidfile);
         }
