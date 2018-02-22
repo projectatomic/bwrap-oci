@@ -39,6 +39,7 @@
 #include "util.h"
 #include "list.h"
 #include "run.h"
+#include "spec.h"
 #include "kill.h"
 
 static gboolean opt_dry_run;
@@ -71,6 +72,7 @@ List of commands:                                               \
 \n  list - list current containers                              \
 \n  run [CONTAINER] - run a container with id CONTAINER           \
 \n  kill CONTAINER SIGNAL - kill CONTAINER with signal SIGNAL   \
+\n  spec - generate a config.json file   \
 ";
 
 int
@@ -136,11 +138,15 @@ main (int argc, char *argv[])
     {
       list_containers ();
     }
-  else if (g_strcmp0 (cmd, "kill") == 0)
+    else if (g_strcmp0 (cmd, "kill") == 0)
     {
       if (argc < 4)
         error (EXIT_FAILURE, 0, "kill needs two arguments");
       kill_container (argv[2], argv[3]);
+    }
+  else if (g_strcmp0 (cmd, "spec") == 0)
+    {
+      spec ();
     }
   else
     {
