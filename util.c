@@ -87,6 +87,7 @@ get_run_directory ()
   gchar run_directory_buffer[64], *ret;
   const char *root = getenv ("XDG_RUNTIME_DIR");
   struct stat st;
+  char *tmp = NULL;
   int r;
 
   if (root == NULL)
@@ -95,16 +96,25 @@ get_run_directory ()
       root = run_directory_buffer;
     }
 
-
   ret = g_strdup_printf ("%s/%s", root, "bwrap-oci");
   r = lstat (ret, &st);
   if (r != 0)
     {
-      if (errno == ENOENT)
-        mkdir (ret, 0700);
-      else
+      char *it;
+      if (errno != ENOENT)
         error (EXIT_FAILURE, errno, "error lstat %s", ret);
+
+      tmp = strdup (ret);
+      for (it = strchr (tmp + 1, '/'); it; it = strchr (it + 1, '/'))
+        {
+          *it = '\0';
+          mkdir (tmp, 0700);
+          *it = '/';
+        }
+      mkdir (ret, 0700);
     }
+
+  free (tmp);
   return ret;
 }
 
@@ -378,9 +388,8 @@ create_container (const char *name)
   if (r != 0 && errno != ENOENT)
     error (EXIT_FAILURE, errno, "error lstat %s", dir);
 
-
   if (mkdir (dir, 0700) < 0)
-    error (EXIT_FAILURE, errno, "error mkdir");
+    error (EXIT_FAILURE, errno, "error mkdir %s", dir);
 
   return dir;
 }
