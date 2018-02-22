@@ -729,7 +729,7 @@ check_running_in_user_namespace ()
 }
 
 static gboolean
-initialize_user_mappings (struct context *context)
+initialize_user_mappings (struct context *context, gboolean dry_run)
 {
   char pipe_fmt[16];
   gboolean has_subuid_map, has_subgid_map;
@@ -746,8 +746,13 @@ initialize_user_mappings (struct context *context)
       return FALSE;
     }
 
-  has_subuid_map = getsubidrange (getuid (), TRUE, &context->user_mapping.first_subuid, &context->user_mapping.n_subuid) == 0 ? TRUE : FALSE;
-  has_subgid_map = getsubidrange (getgid (), FALSE, &context->user_mapping.first_subgid, &context->user_mapping.n_subgid) == 0 ? TRUE : FALSE;
+  if (dry_run)
+    has_subuid_map = has_subgid_map = FALSE;
+  else
+    {
+      has_subuid_map = getsubidrange (getuid (), TRUE, &context->user_mapping.first_subuid, &context->user_mapping.n_subuid) == 0 ? TRUE : FALSE;
+      has_subgid_map = getsubidrange (getgid (), FALSE, &context->user_mapping.first_subgid, &context->user_mapping.n_subgid) == 0 ? TRUE : FALSE;
+    }
 
   if (has_subuid_map != has_subgid_map)
     error (EXIT_FAILURE, 0, "invalid configuration for subuids and subgids");
@@ -794,7 +799,7 @@ run_container (const char *container_id,
 
   context->detach = detach;
 
-  initialize_user_mappings (context);
+  initialize_user_mappings (context, dry_run);
 
   rootval = json_parser_get_root (parser);
   root = json_node_get_object (rootval);
