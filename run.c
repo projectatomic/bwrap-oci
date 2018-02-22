@@ -711,6 +711,24 @@ run_hooks (GList *hooks, const char *stdin)
 }
 
 static gboolean
+check_running_in_user_namespace ()
+{
+  cleanup_free char *buffer = NULL;
+  size_t len;
+  gboolean ret;
+  FILE *f = fopen ("/proc/self/uid_map", "r");
+  char buf[128];
+  if (f == 0)
+    error (EXIT_FAILURE, errno, "opening /proc/self/uid_map");
+
+  len = fread (buf, 1, sizeof (buf) - 1, f);
+  buf[len] = '\0';
+  ret = strstr (buf, "4294967295") ? FALSE : TRUE;
+  fclose (f);
+  return ret;
+}
+
+static gboolean
 initialize_user_mappings (struct context *context)
 {
   char pipe_fmt[16];
@@ -720,6 +738,12 @@ initialize_user_mappings (struct context *context)
     {
       context->has_user_mappings = FALSE;
       return context->has_user_mappings;
+    }
+
+  if (check_running_in_user_namespace ())
+    {
+      context->has_user_mappings = FALSE;
+      return FALSE;
     }
 
   has_subuid_map = getsubidrange (getuid (), TRUE, &context->user_mapping.first_subuid, &context->user_mapping.n_subuid) == 0 ? TRUE : FALSE;
