@@ -454,20 +454,6 @@ do_mounts (struct context *con, JsonNode *rootval)
           else
             collect_options (con, "--tmpfs", destinationval, NULL);
         }
-      else if (g_strcmp0 (typeval, "bind") == 0)
-        {
-          const char *sourceval = NULL;
-          GVariant *source, *options;
-          gboolean readonly = FALSE;
-
-          source = g_variant_lookup_value (variant, "source", G_VARIANT_TYPE_STRING);
-          if (! source)
-            error (EXIT_FAILURE, 0, "invalid source for bind mount\n");
-          sourceval = g_variant_get_string (source, NULL);
-          options = g_variant_lookup_value (variant, "options", G_VARIANT_TYPE_ARRAY);
-          readonly = find_child_value (options, "ro");
-          collect_options (con, readonly ? "--ro-bind" : "--bind", sourceval, destinationval, NULL);
-        }
       else if (g_strcmp0 (typeval, "devtmpfs") == 0)
         collect_options (con, "--dev", destinationval, NULL);
       else if (g_strcmp0 (typeval, "cgroup") == 0)
@@ -488,8 +474,20 @@ do_mounts (struct context *con, JsonNode *rootval)
           readonly = find_child_value (options, "ro");
           collect_options (con, readonly ? "--ro-bind" : "--bind", "/sys", destinationval, NULL);
         }
-      else
-        error (EXIT_FAILURE, 0, "unknown mount type %s\n", typeval);
+      else  /* assume it is a bind mount.  */
+        {
+          const char *sourceval = NULL;
+          GVariant *source, *options;
+          gboolean readonly = FALSE;
+
+          source = g_variant_lookup_value (variant, "source", G_VARIANT_TYPE_STRING);
+          if (! source)
+            error (EXIT_FAILURE, 0, "invalid source for bind mount\n");
+          sourceval = g_variant_get_string (source, NULL);
+          options = g_variant_lookup_value (variant, "options", G_VARIANT_TYPE_ARRAY);
+          readonly = find_child_value (options, "ro");
+          collect_options (con, readonly ? "--ro-bind" : "--bind", sourceval, destinationval, NULL);
+        }
     }
 
   check_required_mounts (con, explicit_mounts);
