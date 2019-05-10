@@ -616,13 +616,37 @@ do_process (struct context *con, JsonNode *rootval)
     }
 }
 
+static char * add_quotes( char  * in )
+{
+  unsigned int len_in = strlen(in);
+  char * ret = malloc(len_in + 3);
+  snprintf(ret, len_in + 3, "\"%s\"", in);
+  return ret;
+}
+
+static char * quote_argv( char * argv, int * to_free )
+{
+  if(strstr(argv, " ") || !strlen(argv))
+  {
+    *to_free = 1;
+    return add_quotes(argv);
+  }
+
+  *to_free = 0;
+  return argv;
+}
+
 static void
 dump_argv (char **argv)
 {
   gboolean first = TRUE;
   while (*argv)
     {
-      g_print ("%s%s", first ? "" : " ", *argv);
+      int to_free = 0;
+      char * tmp_argv = quote_argv(*argv, &to_free);
+      g_print ("%s%s", first ? "" : " ", tmp_argv);
+      if(to_free)
+        free(tmp_argv);
       first = FALSE;
       argv++;
     }
