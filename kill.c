@@ -19,7 +19,9 @@
 #include <config.h>
 #include "util.h"
 #include "kill.h"
+#ifdef HAVE_ERROR_H
 #include <error.h>
+#endif
 #include <stdlib.h>
 #include <errno.h>
 
