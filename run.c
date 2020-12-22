@@ -569,7 +569,7 @@ do_process (struct context *con, JsonNode *rootval)
         {
           GVariant *env = json_gvariant_deserialize (iter->data, "s", NULL);
           cleanup_free char *val = g_variant_dup_string (env, NULL);
-          gchar *sep = g_strrstr (val, "=");
+          gchar *sep = g_strstr_len (val, strlen(val), "=");
           if (!sep)
             error (EXIT_FAILURE, 0, "invalid env setting\n");
           *sep = '\0';
