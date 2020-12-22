@@ -20,7 +20,9 @@
 #include "util.h"
 #include <unistd.h>
 #include <stdlib.h>
+#ifdef HAVE_ERROR_H
 #include <error.h>
+#endif
 #include <stdio.h>
 #include <glib.h>
 #include <glib-object.h>
@@ -369,7 +371,7 @@ get_bundle_path (const char *rootfs)
 {
   gchar *ret;
   cleanup_free gchar *tmp = g_strdup (rootfs);
-  ret = canonicalize_file_name(dirname (tmp));
+  ret = realpath(dirname (tmp), NULL);
   return ret;
 }
 
