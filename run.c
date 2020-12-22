@@ -480,15 +480,29 @@ do_mounts (struct context *con, JsonNode *rootval)
         {
           const char *sourceval = NULL;
           GVariant *source, *options;
-          gboolean readonly = FALSE;
+          gboolean readonly = FALSE, devices= FALSE;
 
           source = g_variant_lookup_value (variant, "source", G_VARIANT_TYPE_STRING);
           if (! source)
             error (EXIT_FAILURE, 0, "invalid source for bind mount\n");
           sourceval = g_variant_get_string (source, NULL);
           options = g_variant_lookup_value (variant, "options", G_VARIANT_TYPE_ARRAY);
+          devices = find_child_value(options, "dev");
           readonly = find_child_value (options, "ro");
-          collect_options (con, readonly ? "--ro-bind" : "--bind", sourceval, destinationval, NULL);
+
+          if( devices && readonly )
+          {
+            error (0, 0, "warning: bind mounts with both 'dev'"
+                         " and 'ro' option are not supported."
+                         " 'dev' option ignored.");
+                         devices= FALSE;
+          }
+
+          collect_options (con, devices?
+                                ("--dev-bind"):(readonly ?
+                                                "--ro-bind" : "--bind"),
+                                sourceval,
+                                destinationval, NULL);
         }
     }
 
